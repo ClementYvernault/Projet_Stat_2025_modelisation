@@ -1,0 +1,44 @@
+
+rm(list=ls())
+
+donnees_forest <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Forest.Rdata", "rb")
+donnees_mean <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Mean.Rdata", "rb")
+
+# on commence par travailler avec donnees_forest
+colnames(donnees_forest)
+library(caret)
+set.seed(36)
+train_index <- createDataPartition(donnees_forest$y, p = 0.8, list = FALSE)
+
+# Diviser les données en train et test
+train_data <- donnees_forest[train_index, ]
+test_data <- donnees_forest[-train_index, ]
+
+# Vérifier les proportions dans les deux ensembles
+prop.table(table(train_data$y))
+prop.table(table(test_data$y))
+
+
+# on enlève le code_elevage aux données
+donnees_forest <- donnees_forest[,-1]
+
+# Maintenant on passe à la glm
+logistic_model <- glm(y ~ . ,data = donnees_forest, family = "binomial")
+library("car")
+vif(logistic_model) 
+# Generalized Variance Inflation Factor GVIF
+# On remarque que T10_PS_EauDebi_3 GVIF = 5.429979 donc on supprime cette variables et on reommence.
+donnees_forest <- donnees_forest[,-which(names(donnees_forest) == "T10_PS_EauDebi_3")]
+logistic_model <- glm(y ~ . ,data = donnees_forest, family = "binomial")
+vif(logistic_model)
+# plus aucune variables n'a un VIF dépassant les 3
+
+# mainteannt on va regarder les prédictions et comparer les résidus
+# Calcul des résidus
+residus <- residuals(logistic_model, type = "deviance")
+
+# Résidus vs valeurs prédites
+predictions <- predict(logistic_model, type = "response")
+
+
+
