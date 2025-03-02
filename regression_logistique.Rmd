@@ -3,7 +3,7 @@ rm(list=ls())
 
 donnees_forest <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Forest.Rdata", "rb")
 donnees_mean <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Mean.Rdata", "rb")
-
+Blocs_Y_76X01_X07
 # on commence par travailler avec donnees_forest
 colnames(donnees_forest)
 library(caret)
