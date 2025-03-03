@@ -44,6 +44,10 @@ library(baguette)
 library(DALEXtra)
 library(pdp)
 
+# Autres
+install.packages("mixOmics")
+library(mixOmics)
+
 # Pour éviter les conflits entre packages (c'est tidymodels qui gagne !)
 tidymodels_prefer()
 
@@ -69,12 +73,38 @@ plot_validation_results <- function(recipe, dat = data_test) {
   recipe %>%
     recipes::prep() %>%
     bake(new_data = dat) %>%
-    ggplot(aes(x = .panel_x, y = .panel_y, color = Species, fill = Species)) +
+    ggplot(aes(x = .panel_x, y = .panel_y, color = y, fill = y)) +
     geom_point(alpha = 0.4, size = 0.5) +
     geom_autodensity(alpha = .3) +
-    facet_matrix(vars(- Species), layer.diag = 2) + 
+    facet_matrix(vars(- y), layer.diag = 2) + 
     scale_color_brewer(palette = "Dark2") + 
     scale_fill_brewer(palette = "Dark2")
+}
+
+transformer_en_dummy <- function(data) {
+  # Parcourir chaque colonne du data frame
+  for (col in names(data)) {
+    if (is.factor(data[[col]]) && col != "y") {
+      # Calculer la modalité la plus fréquente
+      freq <- table(data[[col]], useNA = "no")
+      mode <- names(freq)[which.max(freq)]  # Modalité la plus présente
+      
+      # Créer les dummy variables pour cette colonne
+      dummies <- model.matrix(~ data[[col]] - 1)  # -1 pour exclure l'intercept
+      
+      # Supprimer la colonne correspondant à la modalité la plus fréquente
+      dummies <- dummies[, !colnames(dummies) %in% paste0("data[[col]]", mode), drop = FALSE]
+      
+      # Ajouter les nouvelles colonnes au data frame
+      colnames_dummies <- gsub("data\\[\\[col\\]\\]", paste0(col, "_"), colnames(dummies))
+      colnames(dummies) <- colnames_dummies
+      data <- cbind(data, dummies)
+      
+      # Supprimer la colonne factor originale
+      data[[col]] <- NULL
+    }
+  }
+  return(data)
 }
 
 ##### Exploration des données #####
@@ -83,6 +113,7 @@ plot_validation_results <- function(recipe, dat = data_test) {
 
 data <- readRDS("data_post_etape_4_Mean.Rdata")
 data <- data[,-1]
+data <- transformer_en_dummy(data)
 DT:::datatable(head(data), caption = "Table 1: Données")
 
 #### Résumé des variables ####
