@@ -13,7 +13,11 @@ rm(list=ls())
 # chargement des données 
 donnees_forest <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Forest.Rdata", "rb")
 donnees_mean <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Mean.Rdata", "rb")
+<<<<<<< HEAD
 ```
+=======
+Blocs_Y_76X01_X07
+>>>>>>> 793ef1d9fec51ef1276e9d9f0e638ab56804269f
 # on commence par travailler avec donnees_forest
 colnames(donnees_forest)
 library(caret)
