@@ -1,0 +1,40 @@
+---
+title: "LDA_QDA"
+output: html_document
+date: "2025-03-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list=ls())
+
+
+
+# chargement des données 
+donnees_forest <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Forest.Rdata", "rb")
+donnees_mean <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Mean.Rdata", "rb")
+
+set.seed(36)
+donnees_forest <- donnees_forest[,-1]
+library(caret)
+train_index <- createDataPartition(donnees_forest$y, p = 0.8, list = FALSE)
+train_data <- donnees_forest[train_index, ]
+test_data <- donnees_forest[-train_index, ]
+```
+
+```{r}
+# Charger les librairies nécessaires
+library(MASS)  # Pour LDA et QDA
+# Appliquer LDA et QDA
+lda_model <- lda(y ~ ., data = train_data)
+# QDA_model <- qda(y ~ ., data = train_data)
+
+LDA_pred <- predict(lda_model, test_data)$class
+#QDA_pred <- predict(QDA_model, test_data)$class
+ntest <- nrow(test_data)
+taux_err_LDA <- sum(LDA_pred != test_data[["y"]]) / ntest
+#taux_err_QDA <- sum(QDA_pred != testing_data[["y"]]) / ntest
+```

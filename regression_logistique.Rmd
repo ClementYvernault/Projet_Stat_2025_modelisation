@@ -1,9 +1,19 @@
-
+#vide 
 rm(list=ls())
 
+# installation des packages
+install.packages("VGAM")
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list=ls())
+
+# chargement des données 
 donnees_forest <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Forest.Rdata", "rb")
 donnees_mean <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Mean.Rdata", "rb")
-
+```
 # on commence par travailler avec donnees_forest
 colnames(donnees_forest)
 library(caret)
@@ -11,34 +21,141 @@ set.seed(36)
 train_index <- createDataPartition(donnees_forest$y, p = 0.8, list = FALSE)
 
 # Diviser les données en train et test
+```{r}
+donnees_forest2 <- donnees_forest[,-1]
 train_data <- donnees_forest[train_index, ]
+train_data <- train_data[,-1]
 test_data <- donnees_forest[-train_index, ]
+```
 
 # Vérifier les proportions dans les deux ensembles
 prop.table(table(train_data$y))
 prop.table(table(test_data$y))
 
 
-# on enlève le code_elevage aux données
-donnees_forest <- donnees_forest[,-1]
+On s'interesse aux problèmes de séparation parfaite.
+Il n'y a pas de problème pour les variables catégorielles car on a déjà vérfié les proportions.
+```{r}
+# Sélectionner uniquement les variables explicatives
+vars_explicatives <- names(donnees_forest)[!names(donnees_forest) %in% "y"]
 
-# Maintenant on passe à la glm
-logistic_model <- glm(y ~ . ,data = donnees_forest, family = "binomial")
-library("car")
-vif(logistic_model) 
-# Generalized Variance Inflation Factor GVIF
-# On remarque que T10_PS_EauDebi_3 GVIF = 5.429979 donc on supprime cette variables et on reommence.
-donnees_forest <- donnees_forest[,-which(names(donnees_forest) == "T10_PS_EauDebi_3")]
-logistic_model <- glm(y ~ . ,data = donnees_forest, family = "binomial")
-vif(logistic_model)
-# plus aucune variables n'a un VIF dépassant les 3
+# Boucle pour vérifier la séparation parfaite
+for (var in vars_explicatives) {
+  tab <- table(donnees_forest$y, donnees_forest[[var]])
+  
+  # Vérifie si une modalité d'une variable prédit toujours une seule classe de y
+  if (any(rowSums(tab == 0) == (nrow(tab) - 1))) {
+    cat("⚠️ Problème de séparation parfaite détecté pour :", var, "\n")
+    print(tab)
+  }
+}
+```
 
-# mainteannt on va regarder les prédictions et comparer les résidus
-# Calcul des résidus
-residus <- residuals(logistic_model, type = "deviance")
+On regarde donc chaque variables numérique en effectuant une regression multinomiale.
+Pour A04_My10Mfloc, il y a un problème de fitted_prob pour:
+Individu 33 :
+ENG_malade: 0.1156
+PS_malade: 0.0245
+Sain: 0.8599
 
-# Résidus vs valeurs prédites
-predictions <- predict(logistic_model, type = "response")
+Individu 98 :
+ENG_malade: 0.0378
+PS_malade: 0.0042
+Sain: 0.9581
+Il faut donc supprimer l'individu ou la variable. Una valeur trop élevé -> sain
+
+```{r}
+library(VGAM)  # Pour la régression multinomiale
+
+# Sélectionner uniquement les variables quantitatives
+vars_quanti <- names(donnees_forest)[sapply(donnees_forest, is.numeric)]
+
+for (var in vars_quanti) {
+  cat("\n🔹 Test de la variable :", var, "\n")
+  
+  # Modèle de régression multinomiale
+  formula <- as.formula(paste("y ~", var))
+  model <- vglm(formula, family = multinomial, data = donnees_forest)
+
+  # Extraire les coefficients
+  coef_val <- coef(model)
+  
+  # Vérifier si certains coefficients sont très grands (seuil arbitraire)
+  if (any(abs(coef_val) > 10)) {
+    cat("⚠️ Alerte : Problème de séparation possible ! Coefficients élevés pour", var, "\n")
+  }
+
+  # Vérifier les fitted probabilities
+  fitted_probs <- fitted(model)
+  if (any(fitted_probs < 0.01 | fitted_probs > 0.99)) {
+    cat("⚠️ Alerte : Problème de fitted probabilities proches de 0 ou 1 pour", var, "\n")
+    print(fitted_probs)
+  }
+}
+
+```
+
+On va recoder la variable en 3 modalités 
+```{r}
+library(ggplot2)
+
+# Afficher la distribution sous forme de table pour voir les valeurs distinctes
+table(donnees_forest$A04_My10Mfloc)
+
+# Affichage graphique
+ggplot(donnees_forest, aes(x = as.factor(A04_My10Mfloc))) +
+  geom_bar(fill = "steelblue", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution de A04_My10Mfloc (discrète)")
+
+# Trier les valeurs distinctes et leurs effectifs
+effectifs <- as.data.frame(table(donnees_forest$A04_My10Mfloc))
+colnames(effectifs) <- c("valeur", "effectif")
+effectifs$valeur <- as.numeric(as.character(effectifs$valeur))  # Conversion en numérique si besoin
+effectifs <- effectifs[order(effectifs$valeur), ]
+
+# Trouver un seuil pour avoir au moins 15% d'effectif dans la dernière modalité
+total_effectif <- sum(effectifs$effectif)
+effectifs$cumule <- cumsum(effectifs$effectif) / total_effectif  # Fréquence cumulée
+
+# Déterminer le seuil pour "élevé" (valeur où on dépasse 85% des observations)
+seuil_eleve <- min(effectifs$valeur[effectifs$cumule >= 0.85])
+
+# Définition des 3 groupes en fonction de cette coupure
+donnees_forest$A04_My10Mfloc <- cut(
+  donnees_forest$A04_My10Mfloc,
+  breaks = c(-Inf, 0, seuil_eleve, Inf),
+  labels = c("zero", "moyen", "élevé")
+)
+
+# Transformer en facteur
+donnees_forest$A04_My10Mfloc <- as.factor(donnees_forest$A04_My10Mfloc)
+
+# Vérification de la répartition des classes
+table(donnees_forest$A04_My10Mfloc)
+prop.table(table(donnees_forest$A04_My10Mfloc))
+
+# Affichage graphique après transformation
+ggplot(donnees_forest, aes(x = A04_My10Mfloc)) +
+  geom_bar(fill = "darkorange", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution de A04_My10Mfloc après transformation en factor : seuil = 43839")
+
+```
+
+```{r}
+set.seed(36)
+train_index <- createDataPartition(donnees_forest$y, p = 0.8, list = FALSE)
+train_data <- donnees_forest[train_index, ]
+test_data <- donnees_forest[-train_index, ]
+
+library("VGAM")
+multinomial_logistic_model <- vglm(y ~ . ,data = train_data, family = multinomial)
+```
+# analyse
+```{r}
+summary(multinomial_logistic_model)
+```
 
 
 
