@@ -48,7 +48,7 @@ library(pdp)
 tidymodels_prefer()
 
 #### Fonctions ####
-
+rm(list=ls())
 pvalue <- function(x, ...) {
   x <- x[-length(x)]  # Remove "overall" group
   # Construct vectors of data y, and groups (strata) g
@@ -81,9 +81,9 @@ plot_validation_results <- function(recipe, dat = data_test) {
 
 #### Données et objectifs ####
 
-data(iris)
-data  <- iris
-DT:::datatable(head(iris), caption = "Table 1: Données")
+data <- readRDS("data_post_etape_4_Mean.Rdata")
+data <- data[,-1]
+DT:::datatable(head(data), caption = "Table 1: Données")
 
 #### Résumé des variables ####
 
@@ -91,31 +91,31 @@ skim(data)
 
 #### Analyse bivariée ####
 
-GGally:::ggpairs(data, aes(color = Species))
+GGally:::ggpairs(data, aes(color = y))
 
 
 
-table1( ~ . | Species, data = data, extra.col = list(`p-value`= pvalue), extra.col.pos = 1)
+table1( ~ . | y, data = data, extra.col = list(`p-value`= pvalue), extra.col.pos = 1)
 
 #### Analyse multivariée ####
 
-data_split <- rsample:::initial_split(data, strata = Species, prop = 0.75)
+data_split <- rsample:::initial_split(data, strata = y, prop = 0.75)
 data_train <- training(data_split)  # 75% des observations
 data_test  <- testing(data_split)   # 25% des observations
 
 normalized_rec <- 
-  recipes::recipe(Species ~ ., data = data_train) %>% 
-  step_normalize(- Species)
+  recipes::recipe(y ~ ., data = data_train) %>% 
+  step_normalize(- y)
 
 normalized_rec %>%
-  step_pls(all_numeric_predictors(), outcome = "Species", num_comp = 3) %>%
+  step_pls(all_numeric_predictors(), outcome = "y", num_comp = 3) %>%
   plot_validation_results() + 
   ggtitle("Discriminant Partial Least Squares")
 
 
 
 normalized_rec %>%
-  step_pls(all_numeric_predictors(), outcome = "Species", num_comp = 3) %>%
+  step_pls(all_numeric_predictors(), outcome = "y", num_comp = 3) %>%
   recipes::prep() %>% 
   plot_top_loadings(component_number <= 3, n = 3, type = "pls") + 
   scale_fill_brewer(palette = "Paired") +
@@ -126,16 +126,16 @@ normalized_rec %>%
 #### Séparation des observations ; package {rsample} ####
 
 set.seed(1042)
-data_split <- rsample:::initial_split(data, strata = Species, prop = 0.75)
+data_split <- rsample:::initial_split(data, strata = y, prop = 0.75)
 data_train <- training(data_split)  # 75% des observations
 data_test  <- testing(data_split)   # 25% des observations
-data_folds <- rsample:::vfold_cv(data_train, strata = Species, v = 3, repeats = 3)
+data_folds <- rsample:::vfold_cv(data_train, strata = y, v = 3, repeats = 3)
 
 #### Pré-traitement des variables ; package {recipes} ####
 
 normalized_rec <- 
-  recipe(Species ~ ., data = data_train) %>% 
-  step_normalize(- Species)
+  recipe(y ~ ., data = data_train) %>% 
+  step_normalize(- y)
 
 ##### Modèles évalués #####
 
@@ -195,7 +195,7 @@ normalized <- workflow_set(
 
 # Application des modèles (non basés sur des distances) sur les variables explicatives non-normalisées
 no_pre_proc <- workflow_set(
-  preproc = list(simple = recipe(Species ~ ., data = data_train)),
+  preproc = list(simple = recipe(y ~ ., data = data_train)),
   models  = list(bag_tree     = bag_tree_spec, 
                  C5_rules      = C5_rules_spec,
                  decision_tree = decision_tree_spec, 

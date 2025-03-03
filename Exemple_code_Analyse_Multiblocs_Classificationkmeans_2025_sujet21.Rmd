@@ -92,7 +92,6 @@ library(adegraphics)
 library(fastDummies)
 library(cluster)
 library(table1)
-
 ```
 
 #Création d'un répertoire de travail A modifier selon la localisation de
