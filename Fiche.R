@@ -261,7 +261,7 @@ workflows_res %>%
   select(model, .config, kap = mean, rank)
 
 
-
+chisq.test(data$y, data$A04_My10Mfloc_modéré)
 autoplot(workflows_res,
          rank_metric = "kap",    # how to order models
          select_best = TRUE)  +  # one point per workflow
@@ -321,7 +321,7 @@ Perf_Pred_class.list <- list()
 for (k in 1 : Nb.Model){
   pred.table <- fitted.bestmodel.tuned[[k]] %>% 
     collect_predictions() %>%
-    conf_mat(truth = Species, estimate = .pred_class)
+    conf_mat(truth = y, estimate = .pred_class)
   Perf_Pred_class.list[[k]] <- diag(pred.table$table)/colSums(pred.table$table)*100
 }
 
@@ -363,10 +363,10 @@ for (k in 1 : Nb.Model){
     finalize_workflow(bestmodel.tuned[[k]]) %>% 
     last_fit(data_split)
   
-  explainer[[k]] <- explain_tidymodels(extract_fit_parsnip(mod[[k]]), data = recipe(Species ~ ., data = data_train) %>%
+  explainer[[k]] <- explain_tidymodels(extract_fit_parsnip(mod[[k]]), data = recipe(y ~ ., data = data_train) %>%
                                          recipes::prep() %>% 
                                          bake(new_data = NULL, all_predictors()),
-                                       y = data_train$Species, verbose = F)
+                                       y = data_train$y, verbose = F)
   vip.tab[[k]]     <- DALEX:::model_parts(explainer[[k]], type = "variable_importance")
   vip.plot[[k]]    <- plot(DALEX:::model_parts(explainer[[k]], type = "variable_importance"), max_vars = 20, title = paste(paste(Model.rank[k], '/ Acc.=', sep = ' ', Perf$Accuracy.m[k])), subtitle = '')
   profil[[k]]       <- model_profile(explainer[[k]], type = "partial", variables = colnames(data)[-5])
