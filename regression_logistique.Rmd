@@ -13,7 +13,7 @@ rm(list=ls())
 # chargement des données 
 donnees_forest <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Forest.Rdata", "rb")
 donnees_mean <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Mean.Rdata", "rb")
-<<<<<<< HEAD
+
 ```
 =======
 Blocs_Y_76X01_X07
@@ -158,8 +158,58 @@ multinomial_logistic_model <- vglm(y ~ . ,data = train_data, family = multinomia
 ```
 # analyse
 ```{r}
+
 summary(multinomial_logistic_model)
 ```
+```{r}
+# Charger la librairie dplyr si ce n'est pas déjà fait
+library(dplyr)
 
+# Supprimer les variables spécifiques de la base de données
+donnees_forest <- donnees_forest %>%
+  select(-"X07x1_AN_CONST4_mean_3", 
+         -"T16_BS_TenueSpeciElev", 
+         -"LR_LRF", 
+         -"T10_PS_AlimPoNourrLongpPo")
+
+# Vérifier les nouvelles colonnes de la base de données
+colnames(donnees_forest)
+
+set.seed(36)
+train_index <- createDataPartition(donnees_forest$y, p = 0.8, list = FALSE)
+train_data <- donnees_forest[train_index, ]
+test_data <- donnees_forest[-train_index, ]
+
+library("VGAM")
+multinomial_logistic_model <- vglm(y ~ . ,data = train_data, family = multinomial)
+```
+
+```{r}
+model_summary <- summary(multinomial_logistic_model)
+coefficients <- coefficients(model_summary)
+
+# Utiliser la méthode 'z' pour obtenir les valeurs des statistiques de Wald
+wald_statistics <- coefficients[, "z value"]
+
+# Utiliser la méthode 'Pr(>|z|)' pour obtenir les p-values
+p_values <- coefficients[, "Pr(>|z|)"]
+
+# Vérifier les p-values
+print(p_values)
+
+# Identifier les variables avec des p-values significatives (par exemple p < 0.05)
+significant_vars <- names(p_values)[p_values < 0.05]
+
+# Créer une formule avec les variables significatives
+formula <- as.formula(paste("y ~", paste(significant_vars, collapse = " + ")))
+formula
+# Créer un nouveau modèle avec les variables significatives
+significant_model <- vglm("y ~ X22x1_LOC_INF_rec1:2 + X12x2_MAT_PC2:1 + X12x2_MAT_PC2:2 + 
+    T10_PS_EauDebi_31:1 + X13x2_QUAI_t1:2 + X18x2_ABBTX_PS1:1 + 
+    X19x2_ABB_E1:2 + A03_PosSeroMyAsOui:2 + A03_TxPosSero22sTgReel:1", data = train_data, family = multinomial())
+
+# Afficher le résumé du nouveau modèle
+summary(significant_model)
+```
 
 

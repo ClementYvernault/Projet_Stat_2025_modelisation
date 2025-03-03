@@ -1,0 +1,63 @@
+---
+title: "recodage de A04"
+output: html_document
+date: "2025-03-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+donnees_mean <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Mean.Rdata", "rb")
+
+
+library(ggplot2)
+
+# Afficher la distribution sous forme de table pour voir les valeurs distinctes
+table(donnees_mean$A04_My10Mfloc)
+
+# Affichage graphique
+ggplot(donnees_mean, aes(x = as.factor(A04_My10Mfloc))) +
+  geom_bar(fill = "steelblue", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution de A04_My10Mfloc (discrète)")
+
+# Trier les valeurs distinctes et leurs effectifs
+effectifs <- as.data.frame(table(donnees_mean$A04_My10Mfloc))
+colnames(effectifs) <- c("valeur", "effectif")
+effectifs$valeur <- as.numeric(as.character(effectifs$valeur))  # Conversion en numérique si besoin
+effectifs <- effectifs[order(effectifs$valeur), ]
+
+# Trouver un seuil pour avoir au moins 15% d'effectif dans la dernière modalité
+total_effectif <- sum(effectifs$effectif)
+effectifs$cumule <- cumsum(effectifs$effectif) / total_effectif  # Fréquence cumulée
+
+# Déterminer le seuil pour "élevé" (valeur où on dépasse 85% des observations)
+seuil_eleve <- min(effectifs$valeur[effectifs$cumule >= 0.85])
+
+# Définition des 3 groupes en fonction de cette coupure
+donnees_mean$A04_My10Mfloc <- cut(
+  donnees_mean$A04_My10Mfloc,
+  breaks = c(-Inf, 0, seuil_eleve, Inf),
+  labels = c("absence", "modéré", "élevé")
+)
+
+# Transformer en facteur
+donnees_mean$A04_My10Mfloc <- as.factor(donnees_mean$A04_My10Mfloc)
+
+# Vérification de la répartition des classes
+table(donnees_mean$A04_My10Mfloc)
+prop.table(table(donnees_mean$A04_My10Mfloc))
+
+# Affichage graphique après transformation
+ggplot(donnees_mean, aes(x = A04_My10Mfloc)) +
+  geom_bar(fill = "darkorange", color = "black") +
+  theme_minimal() +
+  labs(title = "Distribution de A04_My10Mfloc après transformation en factor : seuil = 43839")
+
+```
+
+```{r}
+saveRDS(donnees_mean, "data_post_etape_4_Mean.Rdata")
+```
