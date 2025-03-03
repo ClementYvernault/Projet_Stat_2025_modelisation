@@ -7,17 +7,25 @@ output:
   theme: "architect"
 highlight: github
 number_sections: TRUE
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
+
+```{=html}
 <style type="text/css">
   body{
     font-size: 5pt;
   }
 </style>
+```
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-__Packages__
+
+**Packages**
+
 ```{r error=FALSE, message=FALSE, warning=FALSE}
 # chargement des packages nécessaires pour la suite
 library(readxl)
@@ -86,34 +94,40 @@ library(cluster)
 library(table1)
 
 ```
-#Création d'un répertoire de travail 
-A modifier selon la localisation de votre répertoire ou à abandaonner selon vos habitudes.
+
+#Création d'un répertoire de travail A modifier selon la localisation de
+votre répertoire ou à abandaonner selon vos habitudes.
 
 ```{r, echo = T, warning = F, message = F}
 setwd("P:/Progr_Elev_Alterna/3.Enquete_analytique/7.Ergonomie/Analyse_donnees/4.Projet_Tutore_ENSAI/1.Donnees/3.Travail_Juillet2023")
 ```
-__Charger les données __
+
+**Charger les données**
 
 ```{r, echo = T, warning = F, message = F}
 
 load("P:/Progr_Elev_Alterna/3.Enquete_analytique/7.Ergonomie/Analyse_donnees/4.Projet_Tutore_ENSAI/1.Donnees/3.Travail_Juillet2023/BLOCS_X_ordonnes.RData")
 
 ```
-##_______________________________________________________________________________##
-#Analyse multiblocs - 75 variables X 
-##_______________________________________________________________________________## 
-  Blocs_Y_76X01_X07 = fichier contenant 75 variables X et une variable Y.
-  Dans ce fichier les variables sont ordonnées par bloc de variables car dans la suite du code, les blocs de variables seront définis en donnant les indices de colonnes où démarre et se finit le bloc.
-  
+
+##\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_##
+#Analyse multiblocs - 75 variables X
+##\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_##
+Blocs_Y_76X01_X07 = fichier contenant 75 variables X et une variable Y.
+Dans ce fichier les variables sont ordonnées par bloc de variables car
+dans la suite du code, les blocs de variables seront définis en donnant
+les indices de colonnes où démarre et se finit le bloc.
+
 ```{r, echo = T, warning = F, message = F}
 #convertir la variable Y en facteur
 Blocs_Y_76X01_X07$clust_ERGO<-factor(Blocs_Y_76X01_X07$clust_ERGO)
 ```
 
-*Etape 1*
-Découpage en blocs :
-AStuce : les variables doivent être ordonnées par bloc.par exemple toutes les variables du bloc X01 doivent se suivre dans le fichier soumis à l'analyse mbPLS. Puis les variables du bloc X02 doivent suivre celles du bloc X01 et ainsi de suite.
-Ici, au total nous avons 7 blocs de variables X.
+*Etape 1* Découpage en blocs : AStuce : les variables doivent être
+ordonnées par bloc.par exemple toutes les variables du bloc X01 doivent
+se suivre dans le fichier soumis à l'analyse mbPLS. Puis les variables
+du bloc X02 doivent suivre celles du bloc X01 et ainsi de suite. Ici, au
+total nous avons 7 blocs de variables X.
 
 ```{r, echo = T, warning = F, message = F}
 X01_Env_Physique <- Blocs_Y_76X01_X07[,2:8] #7 variables
@@ -125,9 +139,10 @@ X06_Ressenti<- Blocs_Y_76X01_X07[,46:62]#17 variables
 X07_Situation_Personnelle<- Blocs_Y_76X01_X07[,63:76]#14 variables
 ```
 
-*Etape 2*
-#Transformation des vbl quali en vbl indicatrices pour le modèle :
-création des dummy variables avec le package fastDummies. La variable prise en référence correspond à celle dont l'effectif de réponse est le plus élevé.
+*Etape 2* #Transformation des vbl quali en vbl indicatrices pour le
+modèle : création des dummy variables avec le package fastDummies. La
+variable prise en référence correspond à celle dont l'effectif de
+réponse est le plus élevé.
 
 ```{r, echo = T, warning = F, message = F}
 library(fastDummies)
@@ -145,10 +160,11 @@ for(i in 1:length(data)){
 }
 ```
 
-*Etape 3*
-La variable Y est en 3 modalités donc elle est également recodée en dummy variables selon le code indiqué ci-dessous.
+*Etape 3* La variable Y est en 3 modalités donc elle est également
+recodée en dummy variables selon le code indiqué ci-dessous.
 
 #Introduction de la variable Y codée en 3 dummy variables :
+
 ```{r, echo = T, warning = F, message = F}
 Blocs_Y_76X01_X07_2<-Blocs_Y_76X01_X07
 
@@ -161,8 +177,8 @@ Blocs_Y_76X01_X07_2$Y3 <- as.matrix(ifelse(Blocs_Y_76X01_X07_2$clust_ERGO == 3, 
 Blocs_Y_76X01_X07_2 <- Blocs_Y_76X01_X07_2[,-1] 
 ```
 
-*Etape 4*
-Création d'un bloc pour la variable Y codée en dummy variables.
+*Etape 4* Création d'un bloc pour la variable Y codée en dummy
+variables.
 
 ```{r}
 #création d'un vecteur Y
@@ -170,8 +186,8 @@ Y <- Blocs_Y_76X01_X07_2[,76:78]
 data[[8]] <- Y
 ```
 
-*Etape 5*
-Renommer les blocs:
+*Etape 5* Renommer les blocs:
+
 ```{r, echo = T, warning = F, message = F}
 
 new_names <- c("X01_Env_Physique", "X02_Cond_Materielles", "X03_Activites", "X04_Organ_Tps_Travail", "X05_Env_Humain", "X06_Ressenti","X07_Situation_Personnelle","Y")
@@ -180,11 +196,11 @@ names(data) <- new_names
 ```
 
 *Etape 6* **PASSAGE à l'analyse mbPLS**
-###________________###
-# PLS Multibloc
-###________________###
+###\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_### \# PLS Multibloc
+###\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_###
 
 ## Préparation des données
+
 ```{r, echo = T, warning = F, message = F}
 Y <- data[[8]]
 row.names(Y)<-rownames(data[1]) #renommer les lignes du nouveau Y par les numéros des data 1 à 7 car Y prend le code elevage (PIGAL/ELEV/01...) alors que les autres fichiers ont un numéro d'ordre (perte du code_elevage); sans cela le code d'après bloque #à voir si cette étape est nécessaire dans votre code selon la configuration de votre fichier.
@@ -194,6 +210,7 @@ ktabX.ergo <- ktab.list.df(data[1:7])
 ```
 
 ## mbPLS
+
 ```{r, echo = T, warning = F, message = F}
 res.mbpls2   <- mbpls(dudiY.ergo, ktabX.ergo, scale = T, option = "uniform", scannf = FALSE, nf = 10)
 summary(res.mbpls2)
@@ -202,19 +219,24 @@ res.plot     <- plot(res.mbpls2)
 res.2foldcv2 <- testdim(res.mbpls2, nrepet = 500)  # calcul long
 
 ```
+
 NB : les variables X sont centrées et réduites à ce niveau
-__########################################################################__
-#récupération des composantes de tous les axes pour réaliser une classification k-means à partir de ces composantes
-__########################################################################__
+**\########################################################################**
+#récupération des composantes de tous les axes pour réaliser une
+classification k-means à partir de ces composantes
+**\########################################################################**
+
 ```{r, echo = T, warning = F, message = F}
 #pour les X
 recup_compos_X<-res.mbpls2$lX
 #pour les Y
 recup_compos_Y<-res.mbpls2$lY
 ```
-__########################################################################################__
-____Réaliser une classification k-means à partir des deux premières dimensions____
-__########################################################################################__
+
+**\########################################################################################**
+\_\_\_\_Réaliser une classification k-means à partir des deux premières
+dimensions\_\_########################################################################################\_\_
+
 ```{r, echo = T, warning = F, message = F}
 #composantes du bloc X
 data_clust <- recup_compos_X[,c(1:2)] #x premières composantes récupérées pour la suite de la classification
@@ -241,10 +263,11 @@ fviz_gap_stat(gap_stat)
 
 ```
 
+########################################## 
 
-##########################################
 #PERFORM K-MEANS CLUSTERING WITH OPTIMAL K
-##########################################
+\##########################################
+
 ```{r, echo = T, warning = F, message = F}
 #make this example reproducible
 set.seed(123)
@@ -263,19 +286,26 @@ fviz_cluster(res.km, data = data_clust2,
              )
 
 ```
-#Récupération de l'affectation aux clusters pour ajout au fichier de données initial
+
+#Récupération de l'affectation aux clusters pour ajout au fichier de
+données initial
+
 ```{r, echo = T, warning = F, message = F}
 cluster_Y_X<-cbind(Blocs_Y_76X01_X07, cluster_km=res.km$cluster)
 cluster_Y_Xb<-data_frame(cluster_Y_X)
 #déclarer la variable cluster_km en facteur
 cluster_Y_Xb$cluster_km <- as.factor(cluster_Y_Xb$cluster_km)
 ```
+
 # Caractériser les clusters par les variables Y et X originelles
+
 ```{r, echo = T, warning = F, message = F}
 kable(table1(~ . | cluster_km, data = cluster_Y_Xb))
 #NB : clust=nom de la variable contenant le n° des clusters
 ```
-# caractériser les clusters par les variables Y et X sur ou sous représentées à p<0.05
+
+# caractériser les clusters par les variables Y et X sur ou sous représentées à p\<0.05
+
 ```{r, echo = T, warning = F, message = F}
 #pour les var quanti
 #print(catdes(cluster_Y_Xb, num.var =77, proba =0.05)$quanti) #NB : num.var = colonne où clust
@@ -298,10 +328,12 @@ km2_cluster2<-dplyr::as_data_frame(km2_cluster2, rownames = "Variable")
 km2_cluster3<-dplyr::as_data_frame(km2_cluster3, rownames = "Variable")
 km2_cluster4<-dplyr::as_data_frame(km2_cluster4, rownames = "Variable")
 ```
-#___________________________________________________#
-__Exportation de la caractérisation des clusters__
-#___________________________________________________#
-__Exportation des résultats__
+
+#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+**Exportation de la caractérisation des clusters**
+#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+**Exportation des résultats**
+
 ```{r}
 #1 fichier par cluster
 write_xlsx(km2_cluster1, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km2_cluster1.xlsx', col_names = TRUE,
@@ -326,12 +358,10 @@ write_xlsx(list(km2_cluster1, km2_cluster2,km2_cluster3, km2_cluster4), 'P:\\Pro
            use_zip64 = FALSE)
 ```
 
-
-
-
-__########################################################################__
-### Clustering K-means avec 4 dimensions et coupure en 4 clusters########
-__########################################################################__
+**\########################################################################**
+\### Clustering K-means avec 4 dimensions et coupure en 4
+clusters########
+**\########################################################################**
 
 ```{r, echo = T, warning = F, message = F}
 #composantes du bloc X
@@ -359,10 +389,11 @@ fviz_gap_stat(gap_stat)
 
 ```
 
+########################################## 
 
-##########################################
 #PERFORM K-MEANS CLUSTERING WITH OPTIMAL K
-##########################################
+\##########################################
+
 ```{r, echo = T, warning = F, message = F}
 #make this example reproducible
 set.seed(123)
@@ -381,19 +412,26 @@ fviz_cluster(res.km4, data = data_clust42,
              )
 
 ```
-#Récupération de l'affectation aux clusters pour ajout au fichier de données initial
+
+#Récupération de l'affectation aux clusters pour ajout au fichier de
+données initial
+
 ```{r, echo = T, warning = F, message = F}
 cluster_Y_X4<-cbind(Blocs_Y_76X01_X07, cluster_km4=res.km4$cluster)
 cluster_Y_Xb4<-data_frame(cluster_Y_X4)
 #déclarer la variable cluster_km en facteur
 cluster_Y_Xb4$cluster_km4 <- as.factor(cluster_Y_Xb4$cluster_km4)
 ```
+
 # Caractériser les clusters par les variables Y et X originelles
+
 ```{r, echo = T, warning = F, message = F}
 kable(table1(~ . | cluster_km4, data = cluster_Y_Xb4))
 #NB : clust=nom de la variable contenant le n° des clusters
 ```
-# caractériser les clusters par les variables Y et X sur ou sous représentées à p<0.05
+
+# caractériser les clusters par les variables Y et X sur ou sous représentées à p\<0.05
+
 ```{r, echo = T, warning = F, message = F}
 #pour les var quanti
 #print(catdes(cluster_Y_Xb, num.var =77, proba =0.05)$quanti) #NB : num.var = colonne où clust
@@ -417,10 +455,12 @@ km4_cluster3<-dplyr::as_data_frame(km4_cluster3, rownames = "Variable")
 km4_cluster4<-dplyr::as_data_frame(km4_cluster4, rownames = "Variable")
 
 ```
-#___________________________________________________#
-__Exportation de la caractérisation des clusters__
-#___________________________________________________#
-__Exportation des résultats__
+
+#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+**Exportation de la caractérisation des clusters**
+#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+**Exportation des résultats**
+
 ```{r}
 #1 fichier par cluster
 write_xlsx(km4_cluster1, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km4_cluster1.xlsx', col_names = TRUE,
@@ -445,9 +485,10 @@ write_xlsx(list(km4_cluster1, km4_cluster2,km4_cluster3, km4_cluster4), 'P:\\Pro
            use_zip64 = FALSE)
 ```
 
-__########################################################################__
-### Clustering K-means avec 6 dimensions et coupure en 4 clusters########
-__########################################################################__
+**\########################################################################**
+\### Clustering K-means avec 6 dimensions et coupure en 4
+clusters########
+**\########################################################################**
 
 ```{r, echo = T, warning = F, message = F}
 #composantes du bloc X
@@ -475,10 +516,11 @@ fviz_gap_stat(gap_stat)
 
 ```
 
+########################################## 
 
-##########################################
 #PERFORM K-MEANS CLUSTERING WITH OPTIMAL K
-##########################################
+\##########################################
+
 ```{r, echo = T, warning = F, message = F}
 #make this example reproducible
 set.seed(123)
@@ -497,19 +539,26 @@ fviz_cluster(res.km4, data = data_clust62,
              )
 
 ```
-#Récupération de l'affectation aux clusters pour ajout au fichier de données initial
+
+#Récupération de l'affectation aux clusters pour ajout au fichier de
+données initial
+
 ```{r, echo = T, warning = F, message = F}
 cluster_Y_X6<-cbind(Blocs_Y_76X01_X07, cluster_km6=res.km6$cluster)
 cluster_Y_Xb6<-data_frame(cluster_Y_X6)
 #déclarer la variable cluster_km en facteur
 cluster_Y_Xb6$cluster_km6 <- as.factor(cluster_Y_Xb6$cluster_km6)
 ```
+
 # Caractériser les clusters par les variables Y et X originelles
+
 ```{r, echo = T, warning = F, message = F}
 kable(table1(~ . | cluster_km6, data = cluster_Y_Xb6))
 #NB : clust=nom de la variable contenant le n° des clusters
 ```
-# caractériser les clusters par les variables Y et X sur ou sous représentées à p<0.05
+
+# caractériser les clusters par les variables Y et X sur ou sous représentées à p\<0.05
+
 ```{r, echo = T, warning = F, message = F}
 #pour les var quanti
 #print(catdes(cluster_Y_Xb, num.var =77, proba =0.05)$quanti) #NB : num.var = colonne où clust
@@ -534,10 +583,12 @@ km6_cluster4<-dplyr::as_data_frame(km6_cluster4, rownames = "Variable")
 
 
 ```
-#___________________________________________________#
-__Exportation de la caractérisation des clusters__
-#___________________________________________________#
-__Exportation des résultats__
+
+#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+**Exportation de la caractérisation des clusters**
+#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+**Exportation des résultats**
+
 ```{r}
 #1 fichier par cluster
 write_xlsx(km6_cluster1, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km6_cluster1.xlsx', col_names = TRUE,
@@ -562,9 +613,10 @@ write_xlsx(list(km6_cluster1, km6_cluster2,km6_cluster3, km6_cluster4), 'P:\\Pro
            use_zip64 = FALSE)
 ```
 
-__########################################################################__
-### Clustering K-means avec 10 dimensions et coupure en 4 clusters########
-__########################################################################__
+**\########################################################################**
+\### Clustering K-means avec 10 dimensions et coupure en 4
+clusters########
+**\########################################################################**
 
 ```{r, echo = T, warning = F, message = F}
 #composantes du bloc X
@@ -592,10 +644,11 @@ fviz_gap_stat(gap_stat)
 
 ```
 
+########################################## 
 
-##########################################
 #PERFORM K-MEANS CLUSTERING WITH OPTIMAL K
-##########################################
+\##########################################
+
 ```{r, echo = T, warning = F, message = F}
 #make this example reproducible
 set.seed(123)
@@ -614,19 +667,26 @@ fviz_cluster(res.km10, data = data_clust62,
              )
 
 ```
-#Récupération de l'affectation aux clusters pour ajout au fichier de données initial
+
+#Récupération de l'affectation aux clusters pour ajout au fichier de
+données initial
+
 ```{r, echo = T, warning = F, message = F}
 cluster_Y_X10<-cbind(Blocs_Y_76X01_X07, cluster_km10=res.km10$cluster)
 cluster_Y_Xb10<-data_frame(cluster_Y_X10)
 #déclarer la variable cluster_km en facteur
 cluster_Y_Xb10$cluster_km10 <- as.factor(cluster_Y_Xb10$cluster_km10)
 ```
+
 # Caractériser les clusters par les variables Y et X originelles
+
 ```{r, echo = T, warning = F, message = F}
 kable(table1(~ . | cluster_km10, data = cluster_Y_Xb10))
 #NB : clust=nom de la variable contenant le n° des clusters
 ```
-# caractériser les clusters par les variables Y et X sur ou sous représentées à p<0.05
+
+# caractériser les clusters par les variables Y et X sur ou sous représentées à p\<0.05
+
 ```{r, echo = T, warning = F, message = F}
 #pour les var quanti
 #print(catdes(cluster_Y_Xb, num.var =77, proba =0.05)$quanti) #NB : num.var = colonne où clust
@@ -650,10 +710,12 @@ km10_cluster3<-dplyr::as_data_frame(km10_cluster3, rownames = "Variable")
 km10_cluster4<-dplyr::as_data_frame(km10_cluster4, rownames = "Variable")
 
 ```
-#___________________________________________________#
-__Exportation de la caractérisation des clusters__
-#___________________________________________________#
-__Exportation des résultats__
+
+#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+**Exportation de la caractérisation des clusters**
+#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+**Exportation des résultats**
+
 ```{r}
 #1 fichier par cluster
 write_xlsx(km10_cluster1, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km10_cluster1.xlsx', col_names = TRUE,
