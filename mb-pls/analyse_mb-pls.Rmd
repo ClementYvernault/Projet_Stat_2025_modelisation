@@ -35,6 +35,9 @@ library(cluster)
 library(knitr)
 library(table1)
 library(FactoMineR)
+library(dplyr)
+library(writexl)
+
 ```
 
 #Création d'un répertoire de travail A modifier selon la localisation de
@@ -42,7 +45,7 @@ votre répertoire ou à abandaonner selon vos habitudes.
 
 ```{r, echo = T, warning = F, message = F}
 rm(list=ls())
-setwd("/home/rogerbernat/Documents/Projet_Stat_2025_modelisation/")
+setwd("/home/rogerbernat/Documents/Projet_Stat_2025_modelisation")
 ```
 
 **Charger les données**
@@ -74,7 +77,7 @@ noms.ligne <- donnees$code_elevage
 ordonnées par bloc.par exemple toutes les variables du bloc X01 doivent
 se suivre dans le fichier soumis à l'analyse mbPLS. Puis les variables
 du bloc X02 doivent suivre celles du bloc X01 et ainsi de suite. Ici, au
-total nous avons 7 blocs de variables X.
+total nous avons 6 blocs de variables X.
 
 On réalise le découpage par les blocs du fitchir Blocs de variables_Sujet_22_envoi.xlsx
 
@@ -160,14 +163,13 @@ Y <- data[[7]]
 row.names(Y)<-rownames(data[[1]])
 #renommer les lignes du nouveau Y par les numéros des data 1 à 7 car Y prend le code elevage (PIGAL/ELEV/01...) alors que les autres fichiers ont un numéro d'ordre (perte du code_elevage); sans cela le code d'après bloque #à voir si cette étape est nécessaire dans votre code selon la configuration de votre fichier.
 dudiY.ergo <- dudi.pca(Y, center = TRUE, scale = TRUE, scannf = FALSE)
-ktabX.ergo <- ktab.list.df(data[1:7])
+ktabX.ergo <- ktab.list.df(data[1:6])
 ```
 
 ## mbPLS
 
 ```{r, echo = T, warning = F, message = F}
 res.mbpls2   <- mbpls(dudiY.ergo, ktabX.ergo, scale = T, option = "uniform", scannf = FALSE, nf = 10)
-summary(res.mbpls2)
 
 
 res.2foldcv2 <- testdim(res.mbpls2, nrepet = 500)  # calcul long
@@ -242,7 +244,7 @@ fviz_cluster(res.km, data = data_clust2,
 données initial
 
 ```{r, echo = T, warning = F, message = F}
-cluster_Y_X<-cbind(Y, cluster_km=res.km$cluster)
+cluster_Y_X<-cbind(data.clean, cluster_km=res.km$cluster)
 cluster_Y_Xb<-data.frame(cluster_Y_X)
 #déclarer la variable cluster_km en facteur
 cluster_Y_Xb$cluster_km <- as.factor(cluster_Y_Xb$cluster_km)
@@ -258,26 +260,21 @@ kable(table1(~ . | cluster_km, data = cluster_Y_Xb))
 # caractériser les clusters par les variables Y et X sur ou sous représentées à p\<0.05
 
 ```{r, echo = T, warning = F, message = F}
-#pour les var quanti
-#print(catdes(cluster_Y_Xb, num.var =77, proba =0.05)$quanti) #NB : num.var = colonne où clust
 
-#pour les var quali
-print(catdes(cluster_Y_Xb, num.var =77, proba =0.05)$category)#NB : num.var = colonne où clust
+print(catdes(cluster_Y_Xb, num.var =23, proba =0.05)$category)#NB : num.var = colonne où clust
 
 #Récupération des résultats dans une list R
-X2<-catdes(cluster_Y_Xb, num.var =77, proba =0.05)$category # générer une liste contenant les résultats 
+X2<-catdes(cluster_Y_Xb, num.var =23, proba =0.05)$category # générer une liste contenant les résultats 
 
 #Création de data.frame pour chaque cluster
 km2_cluster1<-as.data.frame(X2[["1"]])
 km2_cluster2<-as.data.frame(X2[["2"]])
 km2_cluster3<-as.data.frame(X2[["3"]])
-km2_cluster4<-as.data.frame(X2[["4"]])
 
 #repasser le numéro de ligne en colonne
 km2_cluster1<-dplyr::as_data_frame(km2_cluster1, rownames = "Variable")
 km2_cluster2<-dplyr::as_data_frame(km2_cluster2, rownames = "Variable")
 km2_cluster3<-dplyr::as_data_frame(km2_cluster3, rownames = "Variable")
-km2_cluster4<-dplyr::as_data_frame(km2_cluster4, rownames = "Variable")
 ```
 
 #\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
@@ -287,24 +284,20 @@ km2_cluster4<-dplyr::as_data_frame(km2_cluster4, rownames = "Variable")
 
 ```{r}
 #1 fichier par cluster
-write_xlsx(km2_cluster1, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km2_cluster1.xlsx', col_names = TRUE,
+write_xlsx(km2_cluster1, 'mb-pls/km2/km2_cluster1.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 
-write_xlsx(km2_cluster2, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km2_cluster2.xlsx', col_names = TRUE,
+write_xlsx(km2_cluster2, 'mb-pls/km2/km2_cluster2.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 
-write_xlsx(km2_cluster3, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km2_cluster3.xlsx', col_names = TRUE,
-           format_headers = TRUE,
-           use_zip64 = FALSE)
-
-write_xlsx(km2_cluster4, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km2_cluster4.xlsx', col_names = TRUE,
+write_xlsx(km2_cluster3, 'mb-pls/km2/km2_cluster3.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 
 #tous les clusters dans un seul fichier excel !! attention les onglets n'ont pas de nom mais suivent l'ordre cité dans la fonction
-write_xlsx(list(km2_cluster1, km2_cluster2,km2_cluster3, km2_cluster4), 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\Clusters_km2.xlsx', col_names = TRUE,
+write_xlsx(list(km2_cluster1, km2_cluster2,km2_cluster3), 'mb-pls/km2/Clusters_km2.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 ```
@@ -350,7 +343,7 @@ fviz_gap_stat(gap_stat)
 set.seed(123)
 
 #perform k-means clustering with k = x clusters (x=centers)
-res.km4 <- kmeans(data_clust42, centers = 4, nstart = 25)
+res.km4 <- kmeans(data_clust42, centers = 3, nstart = 25)
 
 #view results
 res.km4
@@ -368,8 +361,8 @@ fviz_cluster(res.km4, data = data_clust42,
 données initial
 
 ```{r, echo = T, warning = F, message = F}
-cluster_Y_X4<-cbind(Blocs_Y_76X01_X07, cluster_km4=res.km4$cluster)
-cluster_Y_Xb4<-data_frame(cluster_Y_X4)
+cluster_Y_X4<-cbind(data.clean, cluster_km4=res.km4$cluster)
+cluster_Y_Xb4<-data.frame(cluster_Y_X4)
 #déclarer la variable cluster_km en facteur
 cluster_Y_Xb4$cluster_km4 <- as.factor(cluster_Y_Xb4$cluster_km4)
 ```
@@ -384,26 +377,21 @@ kable(table1(~ . | cluster_km4, data = cluster_Y_Xb4))
 # caractériser les clusters par les variables Y et X sur ou sous représentées à p\<0.05
 
 ```{r, echo = T, warning = F, message = F}
-#pour les var quanti
-#print(catdes(cluster_Y_Xb, num.var =77, proba =0.05)$quanti) #NB : num.var = colonne où clust
-
 #pour les var quali
-print(catdes(cluster_Y_Xb4, num.var =77, proba =0.05)$category)#NB : num.var = colonne où clust
+print(catdes(cluster_Y_Xb4, num.var =23, proba =0.05)$category)#NB : num.var = colonne où clust
 
 #Récupération des résultats dans une list R
-X4<-catdes(cluster_Y_Xb4, num.var =77, proba =0.05)$category # générer une liste contenant les résultats 
+X4<-catdes(cluster_Y_Xb4, num.var =23, proba =0.05)$category # générer une liste contenant les résultats 
 
 #Création de data.frame pour chaque cluster
 km4_cluster1<-as.data.frame(X4[["1"]])
 km4_cluster2<-as.data.frame(X4[["2"]])
 km4_cluster3<-as.data.frame(X4[["3"]])
-km4_cluster4<-as.data.frame(X4[["4"]])
 
 #repasser le numéro de ligne en colonne
 km4_cluster1<-dplyr::as_data_frame(km4_cluster1, rownames = "Variable")
 km4_cluster2<-dplyr::as_data_frame(km4_cluster2, rownames = "Variable")
 km4_cluster3<-dplyr::as_data_frame(km4_cluster3, rownames = "Variable")
-km4_cluster4<-dplyr::as_data_frame(km4_cluster4, rownames = "Variable")
 
 ```
 
@@ -414,24 +402,21 @@ km4_cluster4<-dplyr::as_data_frame(km4_cluster4, rownames = "Variable")
 
 ```{r}
 #1 fichier par cluster
-write_xlsx(km4_cluster1, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km4_cluster1.xlsx', col_names = TRUE,
+write_xlsx(km4_cluster1, 'mb-pls/km4/km4_cluster1.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 
-write_xlsx(km4_cluster2, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km4_cluster2.xlsx', col_names = TRUE,
+write_xlsx(km4_cluster2, 'mb-pls/km4/km4_cluster2.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 
-write_xlsx(km4_cluster3, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km4_cluster3.xlsx', col_names = TRUE,
+write_xlsx(km4_cluster3, 'mb-pls/km4/km4_cluster3.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 
-write_xlsx(km4_cluster4, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km4_cluster4.xlsx', col_names = TRUE,
-           format_headers = TRUE,
-           use_zip64 = FALSE)
 
 #tous les clusters dans un seul fichier excel !! attention les onglets n'ont pas de nom mais suivent l'ordre cité dans la fonction
-write_xlsx(list(km4_cluster1, km4_cluster2,km4_cluster3, km4_cluster4), 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\Clusters_km4.xlsx', col_names = TRUE,
+write_xlsx(list(km4_cluster1, km4_cluster2,km4_cluster3), 'mb-pls/km4/Clusters_km4.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 ```
@@ -477,7 +462,7 @@ fviz_gap_stat(gap_stat)
 set.seed(123)
 
 #perform k-means clustering with k = x clusters (x=centers)
-res.km6 <- kmeans(data_clust62, centers = 4, nstart = 25)
+res.km6 <- kmeans(data_clust62, centers = 3, nstart = 25)
 
 #view results
 res.km6
@@ -495,7 +480,7 @@ fviz_cluster(res.km4, data = data_clust62,
 données initial
 
 ```{r, echo = T, warning = F, message = F}
-cluster_Y_X6<-cbind(Blocs_Y_76X01_X07, cluster_km6=res.km6$cluster)
+cluster_Y_X6<-cbind(data.clean, cluster_km6=res.km6$cluster)
 cluster_Y_Xb6<-data_frame(cluster_Y_X6)
 #déclarer la variable cluster_km en facteur
 cluster_Y_Xb6$cluster_km6 <- as.factor(cluster_Y_Xb6$cluster_km6)
@@ -515,22 +500,20 @@ kable(table1(~ . | cluster_km6, data = cluster_Y_Xb6))
 #print(catdes(cluster_Y_Xb, num.var =77, proba =0.05)$quanti) #NB : num.var = colonne où clust
 
 #pour les var quali
-print(catdes(cluster_Y_Xb6, num.var =77, proba =0.05)$category)#NB : num.var = colonne où clust
+print(catdes(cluster_Y_Xb6, num.var =23, proba =0.05)$category)#NB : num.var = colonne où clust
 
 #Récupération des résultats dans une list R
-X6<-catdes(cluster_Y_Xb6, num.var =77, proba =0.05)$category # générer une liste contenant les résultats 
+X6<-catdes(cluster_Y_Xb6, num.var =23, proba =0.05)$category # générer une liste contenant les résultats 
 
 #Création de data.frame pour chaque cluster
 km6_cluster1<-as.data.frame(X6[["1"]])
 km6_cluster2<-as.data.frame(X6[["2"]])
 km6_cluster3<-as.data.frame(X6[["3"]])
-km6_cluster4<-as.data.frame(X6[["4"]])
 
 #repasser le numéro de ligne en colonne
 km6_cluster1<-dplyr::as_data_frame(km6_cluster1, rownames = "Variable")
 km6_cluster2<-dplyr::as_data_frame(km6_cluster2, rownames = "Variable")
 km6_cluster3<-dplyr::as_data_frame(km6_cluster3, rownames = "Variable")
-km6_cluster4<-dplyr::as_data_frame(km6_cluster4, rownames = "Variable")
 
 
 ```
@@ -542,24 +525,22 @@ km6_cluster4<-dplyr::as_data_frame(km6_cluster4, rownames = "Variable")
 
 ```{r}
 #1 fichier par cluster
-write_xlsx(km6_cluster1, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km6_cluster1.xlsx', col_names = TRUE,
+write_xlsx(km6_cluster1, 'mb-pls/km6/km6_cluster1.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 
-write_xlsx(km6_cluster2, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km6_cluster2.xlsx', col_names = TRUE,
+write_xlsx(km6_cluster2, 'mb-pls/km6/km6_cluster2.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 
-write_xlsx(km6_cluster3, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km6_cluster3.xlsx', col_names = TRUE,
+write_xlsx(km6_cluster3, 'mb-pls/km6/km6_cluster3.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 
-write_xlsx(km6_cluster4, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km6_cluster4.xlsx', col_names = TRUE,
-           format_headers = TRUE,
-           use_zip64 = FALSE)
+
 
 #tous les clusters dans un seul fichier excel !! attention les onglets n'ont pas de nom mais suivent l'ordre cité dans la fonction
-write_xlsx(list(km6_cluster1, km6_cluster2,km6_cluster3, km6_cluster4), 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\Clusters_km6.xlsx', col_names = TRUE,
+write_xlsx(list(km6_cluster1, km6_cluster2,km6_cluster3), 'mb-pls/km6/Clusters_km6.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 ```
@@ -605,7 +586,7 @@ fviz_gap_stat(gap_stat)
 set.seed(123)
 
 #perform k-means clustering with k = x clusters (x=centers)
-res.km10 <- kmeans(data_clust102, centers = 4, nstart = 25)
+res.km10 <- kmeans(data_clust102, centers = 3, nstart = 25)
 
 #view results
 res.km10
@@ -623,7 +604,7 @@ fviz_cluster(res.km10, data = data_clust62,
 données initial
 
 ```{r, echo = T, warning = F, message = F}
-cluster_Y_X10<-cbind(Blocs_Y_76X01_X07, cluster_km10=res.km10$cluster)
+cluster_Y_X10<-cbind(data.clean, cluster_km10=res.km10$cluster)
 cluster_Y_Xb10<-data_frame(cluster_Y_X10)
 #déclarer la variable cluster_km en facteur
 cluster_Y_Xb10$cluster_km10 <- as.factor(cluster_Y_Xb10$cluster_km10)
@@ -639,26 +620,22 @@ kable(table1(~ . | cluster_km10, data = cluster_Y_Xb10))
 # caractériser les clusters par les variables Y et X sur ou sous représentées à p\<0.05
 
 ```{r, echo = T, warning = F, message = F}
-#pour les var quanti
-#print(catdes(cluster_Y_Xb, num.var =77, proba =0.05)$quanti) #NB : num.var = colonne où clust
 
 #pour les var quali
-print(catdes(cluster_Y_Xb10, num.var =77, proba =0.05)$category)#NB : num.var = colonne où clust
+print(catdes(cluster_Y_Xb10, num.var =23, proba =0.05)$category)#NB : num.var = colonne où clust
 
 #Récupération des résultats dans une list R
-X10<-catdes(cluster_Y_Xb10, num.var =77, proba =0.05)$category # générer une liste contenant les résultats 
+X10<-catdes(cluster_Y_Xb10, num.var =23, proba =0.05)$category # générer une liste contenant les résultats 
 
 #Création de data.frame pour chaque cluster
 km10_cluster1<-as.data.frame(X10[["1"]])
 km10_cluster2<-as.data.frame(X10[["2"]])
 km10_cluster3<-as.data.frame(X10[["3"]])
-km10_cluster4<-as.data.frame(X10[["4"]])
 
 #repasser le numéro de ligne en colonne
 km10_cluster1<-dplyr::as_data_frame(km10_cluster1, rownames = "Variable")
 km10_cluster2<-dplyr::as_data_frame(km10_cluster2, rownames = "Variable")
 km10_cluster3<-dplyr::as_data_frame(km10_cluster3, rownames = "Variable")
-km10_cluster4<-dplyr::as_data_frame(km10_cluster4, rownames = "Variable")
 
 ```
 
@@ -669,25 +646,23 @@ km10_cluster4<-dplyr::as_data_frame(km10_cluster4, rownames = "Variable")
 
 ```{r}
 #1 fichier par cluster
-write_xlsx(km10_cluster1, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km10_cluster1.xlsx', col_names = TRUE,
+write_xlsx(km10_cluster1, 'mb-pls/km10/km10_cluster1.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 
-write_xlsx(km10_cluster2, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km10_cluster2.xlsx', col_names = TRUE,
+write_xlsx(km10_cluster2, "mb-pls/km10/km10_cluster2.xlsx", col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 
-write_xlsx(km10_cluster3, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km10_cluster3.xlsx', col_names = TRUE,
+write_xlsx(km10_cluster3, "mb-pls/km10/km10_cluster3.xlsx", col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 
-write_xlsx(km10_cluster4, 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\km10_cluster4.xlsx', col_names = TRUE,
-           format_headers = TRUE,
-           use_zip64 = FALSE)
+
 
 
 #tous les clusters dans un seul fichier excel !! attention les onglets n'ont pas de nom mais suivent l'ordre cité dans la fonction
-write_xlsx(list(km10_cluster1, km10_cluster2,km10_cluster3, km10_cluster4), 'P:\\Progr_Elev_Alterna\\3.Enquete_analytique\\7.Ergonomie\\Analyse_donnees\\4.Projet_Tutore_ENSAI\\3.Resultats\\3.VariablesX\\4.Res_mbPLS_Kmeans\\Clusters_km10.xlsx', col_names = TRUE,
+write_xlsx(list(km10_cluster1, km10_cluster2,km10_cluster3), 'mb-pls/km10/Clusters_km10.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 ```
