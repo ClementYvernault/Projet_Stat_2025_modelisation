@@ -22,84 +22,26 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-install.packages("fastDummies")
-
 ```
 
 **Packages**
 
 ```{r error=FALSE, message=FALSE, warning=FALSE}
 # chargement des packages nécessaires pour la suite
-library(readxl)
-library(WriteXLS)
-library(tidyverse)
-library(questionr)
-library(dplyr)
-library(skimr)
-library(naniar)
-library(caret)
-library(ggcorrplot)
-library(FactoMineR)
-library(factoextra)
-library(Factoshiny)
-library(FactoInvestigate)
-library(writexl)
-library(summarytools)
-library(corrplot)
-library(readxl)
-library(mice)
-library(DescTools)
-library(bnstruct)
-library(rpart)
-library(rpart.plot)
-library(stringr)
-library(dplyr)
-library(missMDA)
-library(tidyr)
-library(cluster)
-library(tm)
-library(SnowballC)
-library(wordcloud)
-library(RColorBrewer)
-library(explor)
-library(readxl)
-library(tidyverse)
-library(dataMaid)
-library(questionr)
-library(caret)
-library(dplyr)
-library(skimr)
-library(ggplot2)
-library(knitr)
-library(kableExtra)
-library(sf)
-library(sp)
-library(summarytools)
-library(naniar)
-library(writexl)
-library(corrplot)
-library(explor)
-library(car)
-library(multcompView)
-library(Hmisc)
-library(stringr)
-library(reshape2)
-library(here)
-library(purrr)
-library(DescTools)
-library(forcats) 
-library(magrittr) # for piping
-library(ade4)
-library(adegraphics)
 library(fastDummies)
+library(ade4)
+library(factoextra)
 library(cluster)
+library(knitr)
 library(table1)
+library(FactoMineR)
 ```
 
 #Création d'un répertoire de travail A modifier selon la localisation de
 votre répertoire ou à abandaonner selon vos habitudes.
 
 ```{r, echo = T, warning = F, message = F}
+rm(list=ls())
 setwd("/home/rogerbernat/Documents/Projet_Stat_2025_modelisation/")
 ```
 
@@ -107,7 +49,7 @@ setwd("/home/rogerbernat/Documents/Projet_Stat_2025_modelisation/")
 
 ```{r, echo = T, warning = F, message = F}
 
-data <- readRDS("data_post_etape_4_Forest.Rdata")
+donnees <- readRDS("data_post_etape_4_Forest.Rdata")
 
 ```
 
@@ -121,8 +63,11 @@ les indices de colonnes où démarre et se finit le bloc.
 
 ```{r, echo = T, warning = F, message = F}
 # suppression variable code elevage
-data.clean <- data[-1]
+data.clean <- donnees[-1]
 colnames(data.clean)
+rownames(data.clean) <- donnees$code_elevage
+noms.ligne <- donnees$code_elevage
+
 ```
 
 *Etape 1* Découpage en blocs : AStuce : les variables doivent être
@@ -140,7 +85,6 @@ X03_Gestion_Maladies <- data.clean[, c("X18x2_ABBTX_PS", "X19x2_ABB_E")]
 X04_Biosecurite <- data.clean[, c("X12x2_MAT_PC", "X12x2_MAT1FRLAV_1", "T16_BS_TenueSpeciElev", "X13x2_QUAI_t")]
 X05_Facteurs_Infectieux <- data.clean[, c("A03_Pos10sVERS", "A03_PosSeroMyAs", "A03_TxPosSero22sTgReel", "A04_My10Mfloc", "A05_TxPos10sGRIPPEReel")]
 X06_Caracteristiques_Generales <- data.clean[, c("X06x1_gene_majo_1_rec", "X25x1_ElvAlterChoiPers", "LR_LRF")]
-
 ```
 
 *Etape 2* #Transformation des vbl quali en vbl indicatrices pour le
@@ -149,7 +93,6 @@ variable prise en référence correspond à celle dont l'effectif de
 réponse est le plus élevé.
 
 ```{r, echo = T, warning = F, message = F}
-library(fastDummies)
 
 data <- list(X01_Logement_Entretien, X02_Alimentation, X03_Gestion_Maladies, X04_Biosecurite, X05_Facteurs_Infectieux, X06_Caracteristiques_Generales)
 
@@ -167,7 +110,7 @@ for(i in 1:length(data)){
 *Etape 3* La variable Y est en 3 modalités donc elle est également
 recodée en dummy variables selon le code indiqué ci-dessous.
 
-#Introduction de la variable Y codée en 3 dummy variables :
+#Introduction de la variable Y codée en 3 dummy (ie transformation de Y en 3 variables binaires) variables :
 
 ```{r, echo = T, warning = F, message = F}
 dummy_y <- data.frame(y = data.clean$y)
@@ -180,7 +123,7 @@ dummy_y$eng_malade <- as.integer(dummy_y$y == "ENG_malade")
 #suppression de y, la variable Y initiale, qui a été récodée en 3 niveaux Y
 dummy_y <- dummy_y[,-1] 
 summary(dummy_y) 
-# Observons que la moyenne vaut 1 donc bon 
+# Vérifions que la moyenne vaut bien 1 
 sum(unlist(lapply(dummy_y, mean))) == 1
 ```
 
@@ -188,18 +131,20 @@ sum(unlist(lapply(dummy_y, mean))) == 1
 variables.
 
 ```{r}
-#création d'un vecteur Y
-Y <- dummy_y[,1:2]
-# on ne prend pas le plus fréquent ie eng_malade
+# on ne prendra pas le plus fréquent ie eng_malade
 summary(dummy_y)
-data[[7]] <- Y
+
+#création d'un vecteur Y
+bloc.Y <- dummy_y[,1:2]
+
+data[[7]] <- bloc.Y
 ```
 
 *Etape 5* Renommer les blocs:
 
 ```{r, echo = T, warning = F, message = F}
 
-new_names <- c("X01_Logement_Entretien", "X02_Alimentation", "X03_Gestion_Maladies", "X04_Biosecurite", "X05_Facteurs_Infectieux", "X06_Caracteristiques_Generales","Y")
+new_names <- c("X01_Logement_Entretien", "X02_Alimentation", "X03_Gestion_Maladies", "X04_Biosecurite", "X05_Facteurs_Infectieux", "X06_Caracteristiques_Generales", "Bloc_Y")
 names(data) <- new_names
 ```
 
@@ -211,8 +156,9 @@ names(data) <- new_names
 
 ```{r, echo = T, warning = F, message = F}
 Y <- data[[7]]
-# row.names(Y)<-rownames(data[1]) #renommer les lignes du nouveau Y par les numéros des data 1 à 7 car Y prend le code elevage (PIGAL/ELEV/01...) alors que les autres fichiers ont un numéro d'ordre (perte du code_elevage); sans cela le code d'après bloque #à voir si cette étape est nécessaire dans votre code selon la configuration de votre fichier.
-library(ade4)
+
+row.names(Y)<-rownames(data[[1]])
+#renommer les lignes du nouveau Y par les numéros des data 1 à 7 car Y prend le code elevage (PIGAL/ELEV/01...) alors que les autres fichiers ont un numéro d'ordre (perte du code_elevage); sans cela le code d'après bloque #à voir si cette étape est nécessaire dans votre code selon la configuration de votre fichier.
 dudiY.ergo <- dudi.pca(Y, center = TRUE, scale = TRUE, scannf = FALSE)
 ktabX.ergo <- ktab.list.df(data[1:7])
 ```
@@ -225,6 +171,7 @@ summary(res.mbpls2)
 
 
 res.2foldcv2 <- testdim(res.mbpls2, nrepet = 500)  # calcul long
+summary(res.2foldcv2)
 ```
 
 NB : les variables X sont centrées et réduites à ce niveau
@@ -253,7 +200,6 @@ data_clust2 <- scale(data_clust) # centrer
 #########################################
 #DETERMINE HOW MANY CLUSTERS IS OPTIMAL
 #########################################
-library("factoextra")
 #plot number of clusters vs. total within sum of squares
 fviz_nbclust(data_clust2, kmeans, method = "wss")
 
@@ -266,8 +212,6 @@ gap_stat <- clusGap(data_clust2,
 
 #plot number of clusters vs. gap statistic
 fviz_gap_stat(gap_stat)
-
-
 ```
 
 ########################################## 
@@ -299,7 +243,7 @@ données initial
 
 ```{r, echo = T, warning = F, message = F}
 cluster_Y_X<-cbind(Y, cluster_km=res.km$cluster)
-cluster_Y_Xb<-data_frame(cluster_Y_X)
+cluster_Y_Xb<-data.frame(cluster_Y_X)
 #déclarer la variable cluster_km en facteur
 cluster_Y_Xb$cluster_km <- as.factor(cluster_Y_Xb$cluster_km)
 ```
