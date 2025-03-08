@@ -1,5 +1,5 @@
 ---
-title: "PIGAL - exemple de code pour analyse PLS multiblocs suivie d'une classification k-means"
+title: "PIGAL - Analyse PLS multiblocs suivie d'une classification k-means des variables respiratoires"
 author: "Christelle FABLET"
 date: "`r Sys.Date()`"
 output:
@@ -40,46 +40,40 @@ library(writexl)
 
 ```
 
-#Création d'un répertoire de travail A modifier selon la localisation de
-votre répertoire ou à abandaonner selon vos habitudes.
 
-```{r, echo = T, warning = F, message = F}
+```{r, echo = T, warning = F, message = F, eval = T, include = F}
 rm(list=ls())
 setwd("/home/rogerbernat/Documents/Projet_Stat_2025_modelisation")
 ```
 
 **Charger les données**
 
-```{r, echo = T, warning = F, message = F}
+```{r, echo = T, warning = F, message = F, eval = T, include = F}
 
 donnees <- readRDS("data_post_etape_4_Forest.Rdata")
 
 ```
 
-##\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_##
-#Analyse multiblocs - 75 variables X
-##\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_##
-Blocs_Y_76X01_X07 = fichier contenant 75 variables X et une variable Y.
-Dans ce fichier les variables sont ordonnées par bloc de variables car
-dans la suite du code, les blocs de variables seront définis en donnant
-les indices de colonnes où démarre et se finit le bloc.
+## \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
-```{r, echo = T, warning = F, message = F}
+#Analyse multiblocs - 21 variables X et une variable Y
+
+## \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+data.clean = fichier contenant 21 variables X et une variable Y.
+
+
+```{r, echo = T, warning = F, message = F, eval = T, include = F}
 # suppression variable code elevage
 data.clean <- donnees[-1]
 colnames(data.clean)
 rownames(data.clean) <- donnees$code_elevage
 noms.ligne <- donnees$code_elevage
-
 ```
 
-*Etape 1* Découpage en blocs : AStuce : les variables doivent être
-ordonnées par bloc.par exemple toutes les variables du bloc X01 doivent
-se suivre dans le fichier soumis à l'analyse mbPLS. Puis les variables
-du bloc X02 doivent suivre celles du bloc X01 et ainsi de suite. Ici, au
-total nous avons 6 blocs de variables X.
+*Etape 1* 
 
-On réalise le découpage par les blocs du fitchir Blocs de variables_Sujet_22_envoi.xlsx
+On réalise le découpage par les blocs en accord avec le fichier variables_Sujet_22_envoi.xlsx
 
 ```{r, echo = T, warning = F, message = F}
 X01_Logement_Entretien <- data.clean[, c("X22x1_LOC_INF_rec", "X07x1_AN_CONST4_mean_3", "ENG_TROU", "T13_ENG_milieuDegrad.x")]
@@ -90,10 +84,9 @@ X05_Facteurs_Infectieux <- data.clean[, c("A03_Pos10sVERS", "A03_PosSeroMyAs", "
 X06_Caracteristiques_Generales <- data.clean[, c("X06x1_gene_majo_1_rec", "X25x1_ElvAlterChoiPers", "LR_LRF")]
 ```
 
-*Etape 2* #Transformation des vbl quali en vbl indicatrices pour le
-modèle : création des dummy variables avec le package fastDummies. La
-variable prise en référence correspond à celle dont l'effectif de
-réponse est le plus élevé.
+*Etape 2*
+
+Création des dummy (ie binaires) variables avec le package fastDummies. La variable prise en référence correspond à celle dont l'effectif de réponse est le plus élevé.
 
 ```{r, echo = T, warning = F, message = F}
 
@@ -110,10 +103,9 @@ for(i in 1:length(data)){
 }
 ```
 
-*Etape 3* La variable Y est en 3 modalités donc elle est également
-recodée en dummy variables selon le code indiqué ci-dessous.
-
-#Introduction de la variable Y codée en 3 dummy (ie transformation de Y en 3 variables binaires) variables :
+*Etape 3* 
+La variable Y est en 3 modalités donc elle est également recodée en dummy variables selon le code indiqué ci-dessous.
+Introduction de la variable Y codée en 3 dummy (ie transformation de Y en 3 variables binaires) variables :
 
 ```{r, echo = T, warning = F, message = F}
 dummy_y <- data.frame(y = data.clean$y)
@@ -130,8 +122,8 @@ summary(dummy_y)
 sum(unlist(lapply(dummy_y, mean))) == 1
 ```
 
-*Etape 4* Création d'un bloc pour la variable Y codée en dummy
-variables.
+*Etape 4* 
+Création d'un bloc pour la variable Y codée en dummy variables.
 
 ```{r}
 # on ne prendra pas le plus fréquent ie eng_malade
@@ -143,7 +135,9 @@ bloc.Y <- dummy_y[,1:2]
 data[[7]] <- bloc.Y
 ```
 
-*Etape 5* Renommer les blocs:
+*Etape 5* 
+
+Renommer les blocs:
 
 ```{r, echo = T, warning = F, message = F}
 
@@ -151,9 +145,9 @@ new_names <- c("X01_Logement_Entretien", "X02_Alimentation", "X03_Gestion_Maladi
 names(data) <- new_names
 ```
 
-*Etape 6* **PASSAGE à l'analyse mbPLS**
-###\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_### \# PLS Multibloc
-###\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_###
+*Etape 6* 
+
+**PASSAGE à l'analyse mbPLS**
 
 ## Préparation des données
 
@@ -177,10 +171,11 @@ summary(res.2foldcv2)
 ```
 
 NB : les variables X sont centrées et réduites à ce niveau
-**\########################################################################**
-#récupération des composantes de tous les axes pour réaliser une
-classification k-means à partir de ces composantes
-**\########################################################################**
+
+
+# Récupération des composantes de tous les axes pour réaliser une classification k-means à partir de ces composantes
+
+
 
 ```{r, echo = T, warning = F, message = F}
 #pour les X
@@ -189,9 +184,8 @@ recup_compos_X<-res.mbpls2$lX
 recup_compos_Y<-res.mbpls2$lY
 ```
 
-**\########################################################################################**
-\_\_\_\_Réaliser une classification k-means à partir des deux premières
-dimensions\_\_########################################################################################\_\_
+
+# Réaliser une classification k-means à partir des deux premières dimensions
 
 ```{r, echo = T, warning = F, message = F}
 #composantes du bloc X
@@ -208,25 +202,23 @@ fviz_nbclust(data_clust2, kmeans, method = "wss")
 #calculate gap statistic based on number of clusters
 gap_stat <- clusGap(data_clust2,
                     FUN = kmeans,
-                    nstart = 25,
-                    K.max = 10,
-                    B = 50)
+                    nstart = 25, # centroids init random picks best
+                    K.max = 15, # nombre max clusters
+                    B = 100) # nombre iterations FUN
 
 #plot number of clusters vs. gap statistic
 fviz_gap_stat(gap_stat)
 ```
 
-########################################## 
 
-#PERFORM K-MEANS CLUSTERING WITH OPTIMAL K
-\##########################################
+### PERFORM K-MEANS CLUSTERING WITH OPTIMAL K
 
 ```{r, echo = T, warning = F, message = F}
 #make this example reproducible
 set.seed(123)
 
 #perform k-means clustering with k = x clusters (x=centers)
-res.km <- kmeans(data_clust2, centers = 3, nstart = 25)
+res.km <- kmeans(data_clust2, centers = 4, nstart = 25)
 
 #view results
 res.km
@@ -240,8 +232,7 @@ fviz_cluster(res.km, data = data_clust2,
 
 ```
 
-#Récupération de l'affectation aux clusters pour ajout au fichier de
-données initial
+# Récupération de l'affectation aux clusters pour ajout au fichier de données initial
 
 ```{r, echo = T, warning = F, message = F}
 cluster_Y_X<-cbind(data.clean, cluster_km=res.km$cluster)
@@ -270,16 +261,18 @@ X2<-catdes(cluster_Y_Xb, num.var =23, proba =0.05)$category # générer une list
 km2_cluster1<-as.data.frame(X2[["1"]])
 km2_cluster2<-as.data.frame(X2[["2"]])
 km2_cluster3<-as.data.frame(X2[["3"]])
+km2_cluster4<-as.data.frame(X2[["4"]])
 
 #repasser le numéro de ligne en colonne
 km2_cluster1<-dplyr::as_data_frame(km2_cluster1, rownames = "Variable")
 km2_cluster2<-dplyr::as_data_frame(km2_cluster2, rownames = "Variable")
 km2_cluster3<-dplyr::as_data_frame(km2_cluster3, rownames = "Variable")
+km2_cluster4<-dplyr::as_data_frame(km2_cluster4, rownames = "Variable")
+
 ```
 
-#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
 **Exportation de la caractérisation des clusters**
-#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+
 **Exportation des résultats**
 
 ```{r}
@@ -296,16 +289,18 @@ write_xlsx(km2_cluster3, 'mb-pls/km2/km2_cluster3.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 
+write_xlsx(km2_cluster4, 'mb-pls/km2/km2_cluster4.xlsx', col_names = TRUE,
+           format_headers = TRUE,
+           use_zip64 = FALSE)
 #tous les clusters dans un seul fichier excel !! attention les onglets n'ont pas de nom mais suivent l'ordre cité dans la fonction
-write_xlsx(list(km2_cluster1, km2_cluster2,km2_cluster3), 'mb-pls/km2/Clusters_km2.xlsx', col_names = TRUE,
+write_xlsx(list(km2_cluster1, km2_cluster2, km2_cluster3, km2_cluster4), 'mb-pls/km2/Clusters_km2.xlsx', col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
 ```
 
-**\########################################################################**
-\### Clustering K-means avec 4 dimensions et coupure en 4
-clusters########
-**\########################################################################**
+
+### Clustering K-means avec 4 dimensions et coupure en 3 clusters
+
 
 ```{r, echo = T, warning = F, message = F}
 #composantes du bloc X
@@ -324,8 +319,8 @@ fviz_nbclust(data_clust42, kmeans, method = "wss")
 gap_stat <- clusGap(data_clust42,
                     FUN = kmeans,
                     nstart = 25,
-                    K.max = 10,
-                    B = 50)
+                    K.max = 15,
+                    B = 100)
 
 #plot number of clusters vs. gap statistic
 fviz_gap_stat(gap_stat)
@@ -333,10 +328,8 @@ fviz_gap_stat(gap_stat)
 
 ```
 
-########################################## 
 
-#PERFORM K-MEANS CLUSTERING WITH OPTIMAL K
-\##########################################
+### PERFORM K-MEANS CLUSTERING WITH OPTIMAL K
 
 ```{r, echo = T, warning = F, message = F}
 #make this example reproducible
@@ -357,8 +350,7 @@ fviz_cluster(res.km4, data = data_clust42,
 
 ```
 
-#Récupération de l'affectation aux clusters pour ajout au fichier de
-données initial
+# Récupération de l'affectation aux clusters pour ajout au fichier de données initial
 
 ```{r, echo = T, warning = F, message = F}
 cluster_Y_X4<-cbind(data.clean, cluster_km4=res.km4$cluster)
@@ -395,9 +387,8 @@ km4_cluster3<-dplyr::as_data_frame(km4_cluster3, rownames = "Variable")
 
 ```
 
-#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
 **Exportation de la caractérisation des clusters**
-#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+
 **Exportation des résultats**
 
 ```{r}
@@ -421,10 +412,8 @@ write_xlsx(list(km4_cluster1, km4_cluster2,km4_cluster3), 'mb-pls/km4/Clusters_k
            use_zip64 = FALSE)
 ```
 
-**\########################################################################**
-\### Clustering K-means avec 6 dimensions et coupure en 4
-clusters########
-**\########################################################################**
+
+### Clustering K-means avec 6 dimensions et coupure en 3 clusters 
 
 ```{r, echo = T, warning = F, message = F}
 #composantes du bloc X
@@ -443,8 +432,8 @@ fviz_nbclust(data_clust62, kmeans, method = "wss")
 gap_stat <- clusGap(data_clust62,
                     FUN = kmeans,
                     nstart = 25,
-                    K.max = 10,
-                    B = 50)
+                    K.max = 15,
+                    B = 100)
 
 #plot number of clusters vs. gap statistic
 fviz_gap_stat(gap_stat)
@@ -452,10 +441,8 @@ fviz_gap_stat(gap_stat)
 
 ```
 
-########################################## 
 
-#PERFORM K-MEANS CLUSTERING WITH OPTIMAL K
-\##########################################
+### PERFORM K-MEANS CLUSTERING WITH OPTIMAL K
 
 ```{r, echo = T, warning = F, message = F}
 #make this example reproducible
@@ -476,8 +463,7 @@ fviz_cluster(res.km4, data = data_clust62,
 
 ```
 
-#Récupération de l'affectation aux clusters pour ajout au fichier de
-données initial
+# Récupération de l'affectation aux clusters pour ajout au fichier de données initial
 
 ```{r, echo = T, warning = F, message = F}
 cluster_Y_X6<-cbind(data.clean, cluster_km6=res.km6$cluster)
@@ -518,9 +504,9 @@ km6_cluster3<-dplyr::as_data_frame(km6_cluster3, rownames = "Variable")
 
 ```
 
-#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+
 **Exportation de la caractérisation des clusters**
-#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+
 **Exportation des résultats**
 
 ```{r}
@@ -545,10 +531,11 @@ write_xlsx(list(km6_cluster1, km6_cluster2,km6_cluster3), 'mb-pls/km6/Clusters_k
            use_zip64 = FALSE)
 ```
 
-**\########################################################################**
-\### Clustering K-means avec 10 dimensions et coupure en 4
-clusters########
-**\########################################################################**
+
+
+### Clustering K-means avec 10 dimensions et coupure en 3 clusters 
+
+
 
 ```{r, echo = T, warning = F, message = F}
 #composantes du bloc X
@@ -567,8 +554,8 @@ fviz_nbclust(data_clust102, kmeans, method = "wss")
 gap_stat <- clusGap(data_clust102,
                     FUN = kmeans,
                     nstart = 25,
-                    K.max = 10,
-                    B = 50)
+                    K.max = 15,
+                    B = 100)
 
 #plot number of clusters vs. gap statistic
 fviz_gap_stat(gap_stat)
@@ -576,10 +563,11 @@ fviz_gap_stat(gap_stat)
 
 ```
 
-########################################## 
 
-#PERFORM K-MEANS CLUSTERING WITH OPTIMAL K
-\##########################################
+
+### PERFORM K-MEANS CLUSTERING WITH OPTIMAL K
+
+
 
 ```{r, echo = T, warning = F, message = F}
 #make this example reproducible
@@ -600,8 +588,7 @@ fviz_cluster(res.km10, data = data_clust62,
 
 ```
 
-#Récupération de l'affectation aux clusters pour ajout au fichier de
-données initial
+# Récupération de l'affectation aux clusters pour ajout au fichier de données initial
 
 ```{r, echo = T, warning = F, message = F}
 cluster_Y_X10<-cbind(data.clean, cluster_km10=res.km10$cluster)
@@ -639,9 +626,9 @@ km10_cluster3<-dplyr::as_data_frame(km10_cluster3, rownames = "Variable")
 
 ```
 
-#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+
 **Exportation de la caractérisation des clusters**
-#\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_#
+
 **Exportation des résultats**
 
 ```{r}
@@ -657,8 +644,6 @@ write_xlsx(km10_cluster2, "mb-pls/km10/km10_cluster2.xlsx", col_names = TRUE,
 write_xlsx(km10_cluster3, "mb-pls/km10/km10_cluster3.xlsx", col_names = TRUE,
            format_headers = TRUE,
            use_zip64 = FALSE)
-
-
 
 
 #tous les clusters dans un seul fichier excel !! attention les onglets n'ont pas de nom mais suivent l'ordre cité dans la fonction
