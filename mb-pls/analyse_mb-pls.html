@@ -1053,6 +1053,25 @@ a.sourceLine {
 ## y=PS_malade               6.451613  5.555556     31 1.500454e-05 -4.328622
 ## X19x2_ABB_E=0             9.302326 11.111111     43 7.186693e-07 -4.956249
 ## X18x2_ABBTX_PS=0          8.928571 13.888889     56 1.083517e-10 -6.454814</code></pre>
+<div id="intérpretation" class="section level2">
+<h2>Intérpretation</h2>
+<div id="bloc-1" class="section level3">
+<h3>Bloc 1</h3>
+<p>Dans ce groupe, 80 % des porcs (20 sur 25) sont classés en PS_malade, bien au-dessus de la moyenne globale de 31 %. En revanche, seuls 16 % (4 sur 25) présentent le profil ENG_malade, et seulement 4 % (1 sur 25) sont sains. Ce déséquilibre fort indique une surreprésentation de la catégorie PS_malade. Par ailleurs, des variables telles que X09x3_FAB_CROISS_reg_rec (lieu de fabrication de l’aliment de croissance) et les pratiques d’hygiène semblent orienter ce groupe vers des conditions spécifiques, potentiellement liées à des pratiques d’alimentation ou d’entretien qui favorisent ce profil particulier.</p>
+</div>
+<div id="bloc-2" class="section level3">
+<h3>Bloc 2</h3>
+<p>Ici, la répartition est plus équilibrée avec 38,1 % de porcs sains (8 sur 21) et 38,1 % de PS_malade (8 sur 21), tandis que 23,8 % (5 sur 21) présentent le profil ENG_malade. Cette distribution se rapproche de la moyenne globale, mais révèle une légère sous-représentation des ENG_malade (23,8 % vs. 40 % globalement) et une tendance à l’équilibre entre les porcs sains et ceux classés PS_malade. Cela suggère que dans ce groupe, la gestion de l’alimentation (X09x3_FAB_CROISS_reg_rec) et des conditions de logement (ex. partage du matériel, X12x2_MAT_PC) est moins extrême, induisant une hétérogénéité dans l’état de santé.</p>
+</div>
+<div id="bloc-3" class="section level3">
+<h3>Bloc 3</h3>
+<p>Ce bloc se caractérise par une nette prédominance des porcs sains, qui représentent 77,8 % (14 sur 18) contre seulement 5,6 % de PS_malade (1 sur 18) et 16,7 % d’ENG_malade (3 sur 18). Comparé aux moyennes globales, le pourcentage de porcs sains est largement supérieur (77,8 % vs. 29 % globalement), tandis que les profils malades sont fortement sous-représentés. Ce constat indique que les pratiques liées à l’alimentation, au logement et à la biosécurité (ex. nettoyage du quai X13x2_QUAI_t, lavage du matériel X12x2_MAT1FRLAV_1) sont optimisées, contribuant à une excellente santé animale.</p>
+</div>
+<div id="bloc-4" class="section level3">
+<h3>Bloc 4</h3>
+<p>Ici, le profil ENG_malade domine avec 77,8 % des cas (28 sur 36), ce qui est presque le double de la moyenne globale de 40 %. À l’inverse, le profil PS_malade n’est présent qu’à 5,6 % (2 sur 36) et les porcs sains représentent 16,7 % (6 sur 36). Cette forte surreprésentation des ENG_malade peut être liée à des facteurs environnementaux défavorables, tels qu’un milieu dégradé en engraissement (T13_ENG_milieuDegrad.x) et des infrastructures défaillantes (par exemple, la présence d’un trou dans la cloison, ENG_TROU). De plus, l’usage accru d’antibiotiques en cas de besoin (X19x2_ABB_E) reflète la nécessité de compenser ces conditions moins favorables, indiquant un besoin d’améliorer les protocoles de gestion et d’hygiène dans ce bloc.</p>
+</div>
+</div>
 </div>
 <div id="réaliser-une-classification-k-means-à-partir-des-3-premières-dimensions" class="section level1">
 <h1>Réaliser une classification k-means à partir des 3 premières dimensions</h1>
