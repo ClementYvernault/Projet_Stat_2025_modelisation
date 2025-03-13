@@ -233,8 +233,6 @@ no_pre_proc <- workflow_set(
                  rand_forest   = rand_forest_spec, 
                  boost_tree    = boost_tree_spec))
 
-## ATTENTION j'AI ENLEVE C5.0 CAR CA BUGUAIT
-
 # Assemblage des deux workflows
 all_workflows <- bind_rows(no_pre_proc, normalized) %>% 
   mutate(wflow_id = gsub("(simple_)|(normalized_)", "", wflow_id))
@@ -263,7 +261,7 @@ workflows_res %>%
   select(model, .config, kap = mean, rank)
 
 
-chisq.test(data$y, data$A04_My10Mfloc_modéré)
+chisq.test(data$y, data$A04_My10Mfloc_élevé)
 autoplot(workflows_res,
          rank_metric = "kap",    # how to order models
          select_best = TRUE)  +  # one point per workflow
