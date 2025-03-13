@@ -111,8 +111,9 @@ transformer_en_dummy <- function(data) {
 
 #### Données et objectifs ####
 
-data <- readRDS("data_post_etape_4_Mean.Rdata")
+data <- readRDS("Etape_6_post_CorrX.Rdata")
 data <- data[,-1]
+colnames(data)[19] <- "y"
 data <- transformer_en_dummy(data)
 DT:::datatable(head(data), caption = "Table 1: Données")
 
