@@ -113,7 +113,7 @@ transformer_en_dummy <- function(data) {
 
 data <- readRDS("Etape_6_post_CorrX.Rdata")
 data <- data[,-1]
-colnames(data)[19] <- "y"
+colnames(data)[15] <- "y"
 data <- transformer_en_dummy(data)
 DT:::datatable(head(data), caption = "Table 1: Données")
 
@@ -228,11 +228,12 @@ normalized <- workflow_set(
 # Application des modèles (non basés sur des distances) sur les variables explicatives non-normalisées
 no_pre_proc <- workflow_set(
   preproc = list(simple = recipe(y ~ ., data = data_train)),
-  models  = list(bag_tree     = bag_tree_spec, 
-                 C5_rules      = C5_rules_spec,
+  models  = list(bag_tree     = bag_tree_spec,
                  decision_tree = decision_tree_spec, 
                  rand_forest   = rand_forest_spec, 
                  boost_tree    = boost_tree_spec))
+
+## ATTENTION j'AI ENLEVE C5.0 CAR CA BUGUAIT
 
 # Assemblage des deux workflows
 all_workflows <- bind_rows(no_pre_proc, normalized) %>% 
