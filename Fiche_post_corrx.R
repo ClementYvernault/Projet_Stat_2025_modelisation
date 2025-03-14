@@ -113,7 +113,7 @@ transformer_en_dummy <- function(data) {
 
 data <- readRDS("Etape_6_post_CorrX.Rdata")
 data <- data[,-1]
-colnames(data)[19] <- "y"
+colnames(data)[15] <- "y"
 data <- transformer_en_dummy(data)
 DT:::datatable(head(data), caption = "Table 1: Données")
 
@@ -228,8 +228,7 @@ normalized <- workflow_set(
 # Application des modèles (non basés sur des distances) sur les variables explicatives non-normalisées
 no_pre_proc <- workflow_set(
   preproc = list(simple = recipe(y ~ ., data = data_train)),
-  models  = list(bag_tree     = bag_tree_spec, 
-                 C5_rules      = C5_rules_spec,
+  models  = list(bag_tree     = bag_tree_spec,
                  decision_tree = decision_tree_spec, 
                  rand_forest   = rand_forest_spec, 
                  boost_tree    = boost_tree_spec))
@@ -262,7 +261,7 @@ workflows_res %>%
   select(model, .config, kap = mean, rank)
 
 
-chisq.test(data$y, data$A04_My10Mfloc_modéré)
+chisq.test(data$y, data$A04_My10Mfloc_élevé)
 autoplot(workflows_res,
          rank_metric = "kap",    # how to order models
          select_best = TRUE)  +  # one point per workflow
