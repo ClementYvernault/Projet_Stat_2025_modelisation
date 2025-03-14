@@ -2,7 +2,6 @@
 title: "PIGAL - Analyse PLS multiblocs suivie d'une classification k-means des variables respiratoires"
 author: 
     -name : "Christelle FABLET"
-    -name : "Antoni Guàrdia Sanz"
 date: "`r Sys.Date()`"
 output:
   prettydoc::html_pretty:
@@ -30,6 +29,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r error=FALSE, message=FALSE, warning=FALSE}
 # chargement des packages nécessaires pour la suite
+rm(list=ls())
 library(fastDummies)
 library(ade4)
 library(factoextra)
@@ -40,20 +40,14 @@ library(FactoMineR)
 library(dplyr)
 library(writexl)
 library(adegraphics)
-
-```
-
-
-```{r, echo = T, warning = F, message = F, eval = T, include = F}
-rm(list=ls())
-setwd("/home/rogerbernat/Documents/Projet_Stat_2025_modelisation")
+library(dbscan)
 ```
 
 **Charger les données**
 
 ```{r, echo = T, warning = F, message = F, eval = T, include = F}
 
-donnees <- readRDS("data_post_etape_4_Forest.Rdata")
+donnees <- readRDS("/home/rogerbernat/Documents/Projet_Stat_2025_modelisation/data_post_etape_4_Mean.Rdata")
 
 ```
 
@@ -74,11 +68,15 @@ data.clean <- donnees[-1]
 colnames(data.clean)
 rownames(data.clean) <- donnees$code_elevage
 noms.ligne <- donnees$code_elevage
+for(i in 1:length(data.clean)){
+  if(is.numeric(data.clean[i]))
+  data.clean[i] <- scale(data.clean[i])
+}
 ```
 
 *Etape 1* 
 
-On réalise le découpage par les blocs en accord avec le fichier variables_Sujet_22_envoi.xlsx
+On réalise et CODE_ELEVAGEle découpage par les blocs en accord avec le fichier variables_Sujet_22_envoi.xlsx
 
 ```{r, echo = T, warning = F, message = F}
 X01_Logement_Entretien <- data.clean[, c("X22x1_LOC_INF_rec", "X07x1_AN_CONST4_mean_3", "ENG_TROU", "T13_ENG_milieuDegrad.x")]
@@ -128,6 +126,7 @@ sum(unlist(lapply(dummy_y, mean))) == 1
 ```
 
 *Etape 4* 
+
 Création d'un bloc pour la variable Y codée en dummy variables.
 
 ```{r}
@@ -215,13 +214,7 @@ NB : les variables X sont centrées et réduites à ce niveau
 recup_compos_X<-res.mbpls2$lX
 #pour les Y
 recup_compos_Y<-res.mbpls2$lY
-summary(recup_compos_X)
 ```
-
-
-# Approche mbPLS combinée à une classification k-means
-
-L’objectif de cette approche est de regarder si de l’hétérogénéité existe au sein des niveaux de Y et que cela s’explique par des pratiques associées qui sont différentes.
 
 ## Sélection des axes 
 
@@ -232,41 +225,46 @@ red<-rgb(1,0,0,0.5)
 orange <- rgb(1, 0.5, 0, 0.5)  
 green <- rgb(0, 0.8, 0, 0.5)
 # Boucle for
-for(name in names(summary(res.mbpls2))[-1]){
-    var.cum <- summary(res.mbpls2)[[name]][,2]
+for(name in names(invisible(summary(res.mbpls2)))[-1]){
+    var.cum <- invisible(summary(res.mbpls2)[[name]][,2])
     color <- ifelse(var.cum <= 25, red, ifelse(var.cum < 30, orange, green))
     barplot(var.cum,
             main=name,
             col = color,
-            cex.main=2.25,
-            cex.axis=3.5,
+            cex.main=1.25,
+            cex.axis=1.2,
             ylim= c(0,87))
 }
 # legend("topright", legend = c("Erreur validation", "Erreur apprentissage"), col = c("red", "blue"), pch = 16, lty = 1)
 par(mfrow = c(1, 2))
-var.cum <- summary(res.mbpls2)$YandX[,2]
+var.cum <- invisible(summary(res.mbpls2)$YandX[,2])
 color <- ifelse(var.cum <= 25, red, ifelse(var.cum < 30, orange, green))
 
 barplot(var.cum,
             main="Y",
             col = color,
-            cex.main=2.75,
-            cex.axis=3.5,
+            cex.main=1.25,
+            cex.axis=1.2,
             ylim= c(0,100))
-var.cum <- summary(res.mbpls2)$YandX[,4]
+var.cum <- invisible(summary(res.mbpls2)$YandX[,4])
 color <- ifelse(var.cum <= 25, red, ifelse(var.cum < 30, orange, green))
 
 barplot(var.cum,
             main="X",
             col = color,
-            cex.main=2.75,
-            cex.axis=3.5,
+            cex.main=1.25,
+            cex.axis=1.2,
             ylim= c(0,100))
 
 
 ```
+
 Afin d'avoir une variabilité cumulé pour la partie des variables X d'au moins de 25-30%, il faudrait garder 3 axes. 
+
 ## K-means
+
+L’objectif de cette approche est de regarder si de l’hétérogénéité existe au sein des niveaux de Y et que cela s’explique par des pratiques associées qui sont différentes.
+
 ```{r}
 selection_dimensions <- function(res.mbpls, n_dim){
   #composantes du bloc X
@@ -286,8 +284,11 @@ selection_dimensions <- function(res.mbpls, n_dim){
 
 selection_dimensions(recup_compos_X, 3)
 ```
+
 Il semblerait que 3 ou 6 clusters semblent ce dégager.
+
 ### Analyse 3 clusters
+
 ```{R}
 analyse_clusters <- function(res.mbpls, donnees, n_dim, centers){
   data_clust <- res.mbpls[,c(1:n_dim)] #x premières composantes récupérées pour la suite de la classification
@@ -326,7 +327,7 @@ analyse_clusters <- function(res.mbpls, donnees, n_dim, centers){
     cluster_list[[paste("cluster", i, sep = "_")]] <- dplyr::as_data_frame(cluster_list[[paste("cluster", i, sep = "_")]], rownames = "Variable")
   }
   file_path <- paste0("mb-pls/Clusters_km", paste0(n_dim, ".xlsx"))
-  write_xlsx(cluster_list, file_path, col_names = TRUE, format_headers = TRUE, use_zip64 = FALSE)
+  # write_xlsx(cluster_list, file_path, col_names = TRUE, format_headers = TRUE, use_zip64 = FALSE)
   
   return(list("res.km"=res.km,
                "plot.km"=resultat.2dim,
@@ -337,18 +338,49 @@ analyse_clusters <- function(res.mbpls, donnees, n_dim, centers){
 res.3.3 <- analyse_clusters(recup_compos_X, data.clean, 3, 3)
 res.3.3
 ```
-# TODO
-### Analyse 6 clusters
-```{r}
-par(mfrow = c(1, 1))
 
-res.3.6 <- analyse_clusters(recup_compos_X, data.clean, 3, 6)
-res.3.6
-```
-# TODO
-## Hdbscan
+#### Bloc 1 Élevages avec prédominance d’ENG_malade
+
+Dans ce groupe, 66,7 % des élevages présentent des porcs malades en engraissement (ENG_malade), indiquant une vulnérabilité prononcée au niveau de cette phase de production. On note également une utilisation quasi systématique d’antibiotiques en cas de besoin (X19x2_ABB_E=1 à 93,9 %) et un recours très élevé à l’antibiothérapie contre la toux en post-sevrage (X18x2_ABBTX_PS=1 à 97,0 %). La forte présence de « trou dans la cloison » (ENG_TROU=1 à 60,6 %) suggère que des défaillances structurelles ou une hygiène déficiente pourraient contribuer à la propagation des agents pathogènes, exacerbant ainsi les troubles respiratoires observés en phase d’engraissement.
+
+#### Bloc 2 : Élevages caractérisés par une forte prévalence de PS_malade
+
+Dans ce groupe, les porcs en post-sevrage malades (PS_malade) représentent 50,0 % des cas, indiquant que les troubles respiratoires se manifestent majoritairement dès la phase post-sevrage. Contrairement au Bloc 1, l’utilisation d’antibiotiques est nettement réduite, avec X19x2_ABB_E=1 à seulement 10,5 % et X18x2_ABBTX_PS=1 à 13,2 %. Ce profil pourrait refléter des stratégies de gestion moins axées sur les interventions médicamenteuses, potentiellement en raison d’une moindre détection ou prise en charge des symptômes à ce stade. Par ailleurs, la faible fréquence des défaillances structurelles (ENG_TROU=0 à 86,8 %) suggère que d’autres facteurs, comme la sensibilité intrinsèque des porcs post-sevrage ou des pratiques d’élevage spécifiques, pourraient être en jeu dans l’augmentation des cas de PS_malade.
+
+#### Bloc 3 : Élevages avec prédominance d’animaux sains
+
+Ce groupe se distingue par une très forte proportion d’animaux sains (72,4 %), accompagnée d’une faible incidence des troubles respiratoires en engraissement (10,3 % ENG_malade) et en post-sevrage (17,2 % PS_malade). Ces élevages semblent bénéficier de meilleures conditions d’élevage et d’une gestion sanitaire plus efficace, comme en témoigne la moindre utilisation d’antibiotiques contre la toux (X18x2_ABBTX_PS=1 à 24,1 %) et une présence réduite de problèmes structurels (ENG_TROU=1 à seulement 17,2 %). L’ensemble de ces indicateurs souligne l’importance d’un environnement bien entretenu et d’une approche préventive dans la réduction des troubles respiratoires, permettant ainsi d’optimiser la santé et la performance des élevages.
+
+### Analyse 5 clusters
+
 ```{r}
-claasif.hdbscan <- function(res.mbpls, n_dim) {
+
+res.3.5 <- analyse_clusters(recup_compos_X, data.clean, 3, 5)
+res.3.5
+```
+
+#### Bloc A : Élevages avec prédominance d’ENG_malade
+
+Dans ce bloc, représenté par les groupes 3 et 5, la majorité des élevages présente une forte proportion de porcs malades en engraissement (71,4 % et 75,0 % respectivement). Ce constat souligne une vulnérabilité marquée en phase d’engraissement. L’analyse des pratiques révèle des contrastes intéressants entre les deux groupes de ce bloc, notamment en ce qui concerne l’usage des antibiotiques. Par exemple, dans le groupe 3, l’absence quasi totale d’utilisation d’antibiotiques (X19x2_ABB_E : 100 % de 0 et X18x2_ABBTX_PS : 100 % de 0) contraste fortement avec le groupe 5 où l’utilisation est presque systématique (X19x2_ABB_E : 96,4 % de 1 et X18x2_ABBTX_PS : 96,4 % de 1). Ces divergences suggèrent que, malgré une prédisposition similaire à des troubles respiratoires en engraissement, les stratégies thérapeutiques et de gestion peuvent différer, influençant possiblement l’évolution de la maladie.
+
+#### Bloc B : Élevages avec prédominance de PS_malade
+Ce bloc est caractérisé par le groupe 4, où les porcs malades en post-sevrage représentent 67,9 % des élevages, indiquant une incidence élevée de troubles respiratoires dès la période post-sevrage. Dans ce groupe, la proportion d’animaux malades en engraissement reste relativement faible (14,3 %), tandis que la minorité d’animaux sains (17,9 %) met en lumière une problématique spécifique à ce stade. Les indicateurs de pratiques d’élevage, tels que l’uniformité de la génétique (X06x1_gene_majo_1_rec : 100 % de 1) et une répartition équilibrée de certaines mesures d’hygiène ou d’infrastructure (par exemple, T10_PS_EauDebi_3 et X12x2_MAT1FRLAV_1), suggèrent que des facteurs propres au sevrage – et non à l’engraissement – pourraient être à l’origine de la forte prévalence de PS_malade dans ce groupe.
+
+#### Bloc C : Élevages avec prédominance d’animaux sains
+Les groupes 1 et 2 se distinguent par une forte proportion d’animaux sains (83,3 % et 72,2 % respectivement), indiquant des conditions sanitaires globalement favorables. Ces élevages présentent très peu de cas de troubles respiratoires, que ce soit en engraissement ou en post-sevrage. L’analyse des pratiques de gestion et des infrastructures (par exemple, une répartition équilibrée dans X09x3_FAB_CROISS_reg_rec et X22x1_LOC_INF_rec, et des indicateurs modérés sur le débit d’eau aux abreuvoirs) laisse penser que ces élevages bénéficient d’un environnement maîtrisé et de stratégies préventives efficaces. Le recours variable aux antibiotiques, avec un usage plus modéré dans le groupe 1 et une utilisation plus marquée dans le groupe 2, semble néanmoins permettre de maintenir un état sanitaire satisfaisant dans l’ensemble.
+
+
+
+
+
+
+
+
+
+## Hdbscan
+
+```{r}
+clasif.hdbscan <- function(res.mbpls, n_dim) {
   # Extract the first n_dim components from the res.mbpls object
   data_clust <- res.mbpls[, c(1:n_dim)]
   data_clust.scaled <- scale(data_clust)  # Scale the data
@@ -363,15 +395,8 @@ claasif.hdbscan <- function(res.mbpls, n_dim) {
   # Return the HDBSCAN result for further inspection
   return(hdbscan_result)
 }
-res.hdb <- claasif.hdbscan(recup_compos_X, 3)
+res.hdb <- clasif.hdbscan(recup_compos_X, 3)
 res.hdb
 ```
-Pour des clusters avec au moins 5 individus, on obtient 3 cluster comme dans kmeans. Cependant, 54 élevages ne sont pas classées, on n'utilisera donc pas cette méthode par manque de généralisation.
 
-
-# Estimation du poids des blocs et des variables dans l'explication de Y et sélection de variables
-
-* Utilitzar fitxer nou fitxer profe titol com el de la secció *
-
-
-Par l’autre approche mbPLS où vous allez supprimer pas à pas les variables non significatives dans l’explication de Y, vous identifierez des variables qui jouent en moyenne sur chaque niveau et pas le type de subtilité observé en conservant toute les variables du modèle du départ combiné à une classification k-means.
+Pour des clusters avec au moins 5 individus, on obtient 2 cluster, 28 élevages ne sont pas classées et 64 sont dans le même cluster, on n'utilisera donc pas cette méthode par manque de généralisation.
