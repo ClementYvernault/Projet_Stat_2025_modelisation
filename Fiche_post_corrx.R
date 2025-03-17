@@ -47,6 +47,8 @@ library(pdp)
 # Autres
 install.packages("mixOmics")
 library(mixOmics)
+install.packages("qpcR")
+library(qpcR)
 
 # Pour éviter les conflits entre packages (c'est tidymodels qui gagne !)
 tidymodels_prefer()
@@ -360,8 +362,8 @@ for (k in 1 : Nb.Model){
                                        y = data_train$y, verbose = F)
   vip.tab[[k]]     <- DALEX:::model_parts(explainer[[k]], type = "variable_importance")
   vip.plot[[k]]    <- plot(DALEX:::model_parts(explainer[[k]], type = "variable_importance"), max_vars = 20, title = paste(paste(Model.rank[k], '/ Acc.=', sep = ' ', Perf$Accuracy.m[k])), subtitle = '')
-  profil[[k]]       <- model_profile(explainer[[k]], type = "partial", variables = colnames(data)[-5])
-  profil.plot[[k]] <- plot(profil[[k]], variables = colnames(data)[-5]) + ggtitle(paste(paste(Model.rank[k], '/ Acc.=', sep = ' ', Perf$Accuracy.m[k])), "")
+  profil[[k]]       <- model_profile(explainer[[k]], type = "partial", variables = colnames(data)[-4])
+  profil.plot[[k]] <- plot(profil[[k]], variables = colnames(data)[-4]) + ggtitle(paste(paste(Model.rank[k], '/ Acc.=', sep = ' ', Perf$Accuracy.m[k])), "")
 }
 
 #### Importance de chaque variable ####
@@ -378,7 +380,9 @@ lapply(1 : Nb.Model, function(k) profil.plot[[k]])
 model.sel      <- Perf$model[Perf$Accuracy.m > 0.5 & Perf$Accuracy.p > 0.5]   # Modifier le seuil de 0.9 (90% bien classés par le modèle) selon les données
 model.rank.sel <- which(Model.rank %in% model.sel)
 
-vip.tab[[1]]$permutation
+vip.tab[[2]]$permutation
+summary(vip.tab)
+
 # Calcul des VIP moyens par variable (pour les 10 permutations)
 nb.permut <- 10
 vip.tab.moy <- list()
@@ -388,15 +392,22 @@ for (i in 1 : length(model.rank.sel)){
                                 by = list(vip.tab[[k]][vip.tab[[k]]$permutation %in% c(1:nb.permut), ]$variable), mean)
   colnames(vip.tab.moy[[i]]) <- c('Variable', Model.rank[k])
 } 
-names(vip.tab.moy) <- Model.rank
+rownames(vip.tab.moy.all)
+names(vip.tab.moy) <- Model.rank[1:6]
 
 # Regroupement des VIP moyens
-vip.tab.moy.all.raw           <- list.cbind(vip.tab.moy)
+vip.tab.moy.all.raw           <- qpcR::list.cbind(vip.tab.moy)
+vip.tab.moy.all.raw <- bind_cols(vip.tab.moy)
 rownames(vip.tab.moy.all.raw) <- vip.tab.moy.all.raw[, 1]
 vip.tab.moy.all               <- vip.tab.moy.all.raw[rownames(vip.tab.moy.all.raw) != '_baseline_', seq(2, 2*length(model.rank.sel), 2)]
 vip.tab.moy.all2              <- vip.tab.moy.all[rownames(vip.tab.moy.all) != '_full_model_', ]
 vip.seuil                     <- vip.tab.moy.all[rownames(vip.tab.moy.all) %in% '_full_model_', ]
 
+# test
+summary(vip.tab.moy.all)
+
+
+########################################## a demander
 # Sélection des variables selon un seuil par variable
 vip.tab.sel           <- matrix(0, nrow = nrow(vip.tab.moy.all2), ncol = ncol(vip.tab.moy.all2))
 colnames(vip.tab.sel) <- colnames(vip.tab.moy.all2)
