@@ -111,9 +111,8 @@ transformer_en_dummy <- function(data) {
 
 #### Données et objectifs ####
 
-data <- readRDS("Etape_6_post_CorrX.Rdata")
+data <- readRDS("data_post_etape_4_Mean.Rdata")
 data <- data[,-1]
-colnames(data)[15] <- "y"
 data <- transformer_en_dummy(data)
 DT:::datatable(head(data), caption = "Table 1: Données")
 
@@ -188,14 +187,6 @@ rand_forest_spec <- rand_forest(mtry = tune(), min_n = tune(), trees = 1000) %>%
 
 boost_tree_spec <- boost_tree(tree_depth = tune(), trees = 1000, learn_rate = tune(), mtry = tune(), min_n = tune(), loss_reduction = tune()) %>% 
   set_engine("xgboost") %>% 
-  set_mode("classification")
-
-decision_tree_spec <- decision_tree(cost_complexity = tune(), tree_depth = tune()) %>% 
-  set_engine("rpart") %>% 
-  set_mode("classification") 
-
-bag_tree_spec <- bag_tree() %>% 
-  set_engine("rpart", times = 50L) %>% 
   set_mode("classification")
 
 C5_rules_spec <- C5_rules() %>%
@@ -380,6 +371,48 @@ lapply(1 : Nb.Model, function(k) vip.plot[[k]])
 #### Influence de chaque variable ####
 
 lapply(1 : Nb.Model, function(k) profil.plot[[k]])
+
+#### Sélection des variables selon leur VIP pour les meilleurs modèles ####
+
+# Sélection des modèles interprétables
+model.sel      <- Perf$model[Perf$Accuracy.m > 0.5 & Perf$Accuracy.p > 0.5]   # Modifier le seuil de 0.9 (90% bien classés par le modèle) selon les données
+model.rank.sel <- which(Model.rank %in% model.sel)
+
+vip.tab[[1]]$permutation
+# Calcul des VIP moyens par variable (pour les 10 permutations)
+nb.permut <- 10
+vip.tab.moy <- list()
+for (i in 1 : length(model.rank.sel)){
+  k <- model.rank.sel[i]
+  vip.tab.moy[[i]] <- aggregate(vip.tab[[k]][vip.tab[[k]]$permutation %in% c(1:nb.permut), ]$dropout_loss, 
+                                by = list(vip.tab[[k]][vip.tab[[k]]$permutation %in% c(1:nb.permut), ]$variable), mean)
+  colnames(vip.tab.moy[[i]]) <- c('Variable', Model.rank[k])
+} 
+names(vip.tab.moy) <- Model.rank
+
+# Regroupement des VIP moyens
+vip.tab.moy.all.raw           <- list.cbind(vip.tab.moy)
+rownames(vip.tab.moy.all.raw) <- vip.tab.moy.all.raw[, 1]
+vip.tab.moy.all               <- vip.tab.moy.all.raw[rownames(vip.tab.moy.all.raw) != '_baseline_', seq(2, 2*length(model.rank.sel), 2)]
+vip.tab.moy.all2              <- vip.tab.moy.all[rownames(vip.tab.moy.all) != '_full_model_', ]
+vip.seuil                     <- vip.tab.moy.all[rownames(vip.tab.moy.all) %in% '_full_model_', ]
+
+# Sélection des variables selon un seuil par variable
+vip.tab.sel           <- matrix(0, nrow = nrow(vip.tab.moy.all2), ncol = ncol(vip.tab.moy.all2))
+colnames(vip.tab.sel) <- colnames(vip.tab.moy.all2)
+rownames(vip.tab.sel) <- rownames(vip.tab.moy.all2)
+for (i in 1 : length(model.rank.sel)){
+  if (model.sel[i] %in% c('nearest_neighbor', 'svm_poly', 'multinom_reg')){
+    vip.tab.sel[vip.tab.moy.all2[, i] < floor(as.numeric(vip.seuil[i])), i] <- 1
+  } else if (model.sel[i] %in% c('rand_forest', 'bag_tree', 'boost_tree', 'C5_rules', 'decision_tree')) {
+    vip.tab.sel[vip.tab.moy.all2[, i] > ceiling(as.numeric(vip.seuil[i])), i] <- 1
+  } else if (model.sel[i] %in% c('svm_rbf', 'mlp')){
+    vip.tab.sel[vip.tab.moy.all2[, i] < floor(as.numeric(vip.seuil[i])) | vip.tab.moy.all2[, i] > ceiling(as.numeric(vip.seuil[i])), i] <- 1
+  }
+}
+vip.tab.sel2 <- cbind.data.frame(vip.tab.sel, as.matrix(apply(vip.tab.sel, 1, sum)))
+colnames(vip.tab.sel2)[length(model.rank.sel)+1] <- 'Sum'
+kable(vip.tab.sel2)
 
 ##### Utilisation des modèles (prédiction) #####
 
