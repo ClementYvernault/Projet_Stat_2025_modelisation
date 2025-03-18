@@ -1,0 +1,350 @@
+---
+title: "Analyse mbPLs avec estimation du poids des blocs et des variables dans l'explication de Y et sélection de variables"
+date: "`r Sys.Date()`"
+author: 
+    -name : "Christelle FABLET"
+output:
+  prettydoc::html_pretty:
+  theme: "architect"
+highlight: github
+number_sections: TRUE
+---
+<style type="text/css">
+  body{
+    font-size: 5pt;
+  }
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r,error=FALSE, message=FALSE, warning=FALSE, include=F, eval=T}
+rm(list=ls())
+library(fastDummies)
+library(ade4)
+library(factoextra)
+library(cluster)
+library(knitr)
+library(table1)
+library(FactoMineR)
+library(dplyr)
+library(writexl)
+library(adegraphics)
+```
+
+# Chargement des données
+
+# Variables X pouvant expliquer le statut BESASP des élevages NE
+```{r}
+donnees <- readRDS("/home/rogerbernat/Documents/Projet_Stat_2025_modelisation/data_post_etape_4_Mean.Rdata")
+
+```
+
+-------------Mise en forme des données 
+
+On commence par centrer-réduire toutes les variables quantitatives du jeu de données:
+
+```{r}
+set.seed(1234567)
+
+data.clean <- donnees[-1]
+rownames(data.clean) <- donnees$code_elevage
+noms.ligne <- donnees$code_elevage
+for(i in 1:length(data.clean)){
+  if(is.numeric(data.clean[i]))
+  data.clean[i] <- scale(data.clean[i])
+}
+```
+
+
+N=100
+p = 22 dont variable Y
+
+Découpage en blocs:
+ 
+```{r}
+X01_Logement_Entretien <- data.clean[, c("X22x1_LOC_INF_rec", "X07x1_AN_CONST4_mean_3", "ENG_TROU", "T13_ENG_milieuDegrad.x")]
+X02_Alimentation <- data.clean[, c("T10_PS_EauDebi_3", "T10_PS_AlimPoNourrLongpPo", "X09x3_FAB_CROISS_reg_rec")]
+X03_Gestion_Maladies <- data.clean[, c("X18x2_ABBTX_PS", "X19x2_ABB_E")]
+X04_Biosecurite <- data.clean[, c("X12x2_MAT_PC", "X12x2_MAT1FRLAV_1", "T16_BS_TenueSpeciElev", "X13x2_QUAI_t")]
+X05_Facteurs_Infectieux <- data.clean[, c("A03_Pos10sVERS", "A03_PosSeroMyAs", "A03_TxPosSero22sTgReel", "A04_My10Mfloc", "A05_TxPos10sGRIPPEReel")]
+X06_Caracteristiques_Generales <- data.clean[, c("X06x1_gene_majo_1_rec", "X25x1_ElvAlterChoiPers", "LR_LRF")]
+
+```
+
+Transformation des vbl quali en vbl indicatrices pour le modèle:
+
+```{r}
+data <- list(X01_Logement_Entretien, X02_Alimentation, X03_Gestion_Maladies, X04_Biosecurite, X05_Facteurs_Infectieux, X06_Caracteristiques_Generales)
+
+for(i in 1:length(data)){
+  df <- data[[i]]
+  for(var in names(df)){
+    if(is.factor(df[[var]])){
+      df <- dummy_cols(df, var, remove_selected_columns = TRUE, remove_most_frequent_dummy = TRUE)
+    }
+  }
+  data[[i]] <- df
+}
+```
+__Y en dummy variables__
+#Traitement de la variable Y en 4 dummy variables
+```{r}
+dummy_y <- data.frame(y = data.clean$y)
+
+# Create des 3 Y
+dummy_y$sain <- as.integer(dummy_y$y == "Sain")
+dummy_y$ps_malade <- as.integer(dummy_y$y == "PS_malade")
+dummy_y$eng_malade <- as.integer(dummy_y$y == "ENG_malade")
+
+```
+
+```{r}
+#création d'un vecteur Y
+bloc.Y <- dummy_y[,2:4]
+data[[7]] <- bloc.Y
+```
+
+Renommer les blocs:
+```{r, echo = T, warning = F, message = F}
+new_names <- c("X01_Logement_Entretien", "X02_Alimentation", "X03_Gestion_Maladies", "X04_Biosecurite", "X05_Facteurs_Infectieux", "X06_Caracteristiques_Generales", "Bloc_Y")
+names(data) <- new_names
+```
+
+----------------------------------------------------------------
+-----------------------ANALYSE  --------------------------------
+----------------------------------------------------------------
+# PLS Multibloc
+
+## Préparation des données
+```{r, echo = T, warning = F, message = F}
+Y <- data[[7]]
+dudiY.NE <- dudi.pca(Y, center = TRUE, scale = TRUE, scannf = FALSE)
+ktabX.NE <- ktab.list.df(data[1:6])
+```
+
+## mbPLS
+```{r, echo = T, warning = F, message = F}
+res.mbpls2   <- mbpls(dudiY.NE, ktabX.NE, scale = TRUE, option = "uniform", scannf = F, nf = 10)
+res.plot     <- plot(res.mbpls2)
+res.2foldcv2 <- testdim(res.mbpls2, nrepet = 500)  # calcul long
+```
+
+NB : les variables X sont centrées et réduites à ce niveau
+
+## Choix des dimensions
+
+Choix du nombre de dimensions a interpréter (minimiser l'erreur de prédiction 2-fold et d'explication)
+```{r, echo = T, warning = F, message = F}
+par(mfrow = c(1, 3))
+somme <- res.2foldcv2$statsRMSEv$Mean + res.2foldcv2$statsRMSEc$Mean
+plot(res.2foldcv2$statsRMSEc$Mean)
+plot(res.2foldcv2$statsRMSEv$Mean)
+plot(somme)
+match(min(na.omit(somme)), somme)
+```
+
+4 dimensions
+## Analyse
+
+```{r, echo = T, warning = F, message = F}
+opt.dim <- 4
+res.boot <- randboot(res.mbpls2, opt.dim, nrepet = 500) # calcul long
+```
+
+```{r, echo = T, warning = F, message = F}
+res.plot[[3]]   # Blocs Xk
+```
+
+Le bloc 06 contribu uniquement à la construction du premier axe. Le reste des bocs contribuent tous à la costruction des deux axes. Cependant les blocs 5,2,4 (tangibles, plus directes) plus dans le deuxième axe et les blocs 3-1 (moins directes: logistique) dans le premer
+
+```{r}
+plot(res.boot$bipc)                  # Importance des blocs explicatifs (seuil 1/K, K = nb blocs)
+```
+6 blocs X donc 1/k=17%; 0.17
+Tous les blocs sont >0 et semblent >0.16 sauf  X04 Biosecurite IC passe dans l'intervalle comprenant 0.16.
+
+### Variables
+
+```{r, echo = T, warning = F, message = F}
+res.plot[[4]]   # Variable Y
+```
+
+Sain positivement dans l'axe 2. 
+
+ps_malade dans les deux axes négativement, eng_malade, negativement axe 2 et positivement axe 1, eng et ps semblent s'opposer.
+
+Interpret : 
+
+* Axe 2 discrimine malade sain
+
+* Axe 1 discrimine eng ou ps malade
+```{r}
+res.plot[[5]]   # Variables Xk
+```
+
+TODO/ Utile ? Var les plus carac peut-être
+
+* Axe 1 positivement : 
+
+* Axe 1 negativement : 
+
+* Axe 1 positivement : 
+
+* Axe 1 negativement : 
+```{r}
+plot(res.boot$vipc)                  # Importance des variables explicatives (pour tout le bloc Y ; seuil 1/P)
+plot(res.boot$XYcoef[[1]])           # Importance des variables explicatives (pour la variable y1 ; seuil 0)
+plot(res.boot$XYcoef[[2]])           # Importance des variables explicatives (pour la variable y2 ; seuil 0)
+plot(res.boot$XYcoef[[3]])           # Importance des variables explicatives (pour la variable y2 ; seuil 0)
+``` 
+
+On cherche à identifier les variables dont toutes les modalités ont un IC qui passe par zéro pour toutes les modalités de Y.
+
+```{r}
+
+# Init variable toujours dont IC passe par 0
+tjrs_0 <- function(res.boot){
+  toujours_0 <- rep(TRUE, nrow(res.boot$XYcoef[[1]]$stats))
+
+  # Pour chaque modalité de Y
+  for (i in 1:length(Y)) {
+    # selection des bornes
+    lower <- res.boot$XYcoef[[i]]$stats[, 1]
+    upper <- res.boot$XYcoef[[i]]$stats[, 2]
+    
+    # Regarde si IC dans 0
+    ci_includes_zero <- (lower <= 0) & (upper >= 0)
+    
+    # mise à jour de la variable tjrs_0
+    toujours_0 <- toujours_0 & ci_includes_zero
+  }
+  return(toujours_0)
+}
+tjrs_0(res.boot)
+```
+
+Ainsi on supprime :
+
+* ENG_TROU
+* X18x2_ABBTX_PS
+* X19x2_ABB_E
+* X12x2_MAT1FRLAV
+* X13x2_QUAI_t
+
+```{r}
+var.suppr <- c("ENG_TROU", "X18x2_ABBTX_PS",
+              "X19x2_ABB_E", "X12x2_MAT1FRLAV", "X13x2_QUAI_t")
+var_dummy.suppr <- grep(paste(var.suppr, collapse = "|"), names(toujours_0), value = TRUE)
+var_dummy.suppr
+for(i in seq_along(data)) {
+  data[[i]] <- data[[i]] %>%
+    dplyr::select(-any_of(var_dummy.suppr))  # Explicit dplyr::select
+}
+# Détection si bloc vide et suppression
+bloc.vide <- c()
+for(i in 1:length(data)){
+  if(ncol(data[[i]]) == 0){
+    bloc.vide <- c(bloc.vide, i)
+  }
+}
+bloc.vide # blocs a supprimer 
+data <- data[-bloc.vide]
+
+# detection blocs a variables uniques 
+bloc.unic <- c()
+for(i in 1:length(data)){
+  if(ncol(data[[i]]) == 1){
+    bloc.unic <- c(bloc.unic, i)
+  }
+}
+bloc.unic
+names(data)
+```
+Le bloc de gestion des maladies n'et plus présent
+
+## Deuxième mb-pls
+
+```{r, echo = T, warning = F, message = F}
+dudiY.NE <- dudi.pca(Y, center = TRUE, scale = TRUE, scannf = FALSE)
+ktabX.NE <- ktab.list.df(data[1:5])
+res.mbpls2   <- mbpls(dudiY.NE, ktabX.NE, scale = TRUE, option = "uniform", scannf = F, nf = 10)
+res.plot     <- plot(res.mbpls2)
+res.2foldcv2 <- testdim(res.mbpls2, nrepet = 500)  # calcul long
+```
+
+## Choix des dimensions
+
+```{r, echo = T, warning = F, message = F}
+par(mfrow = c(1, 3))
+somme <- res.2foldcv2$statsRMSEv$Mean + res.2foldcv2$statsRMSEc$Mean
+plot(res.2foldcv2$statsRMSEc$Mean)
+plot(res.2foldcv2$statsRMSEv$Mean)
+plot(somme)
+match(min(na.omit(somme)), somme)
+```
+On prend 4 dimensions encore une fois.
+
+## Analyse
+
+```{r, echo = T, warning = F, message = F}
+opt.dim <- 4
+res.boot <- randboot(res.mbpls2, opt.dim, nrepet = 500) # calcul long
+```
+
+```{r, echo = T, warning = F, message = F}
+res.plot[[1]]
+```
+
+## Blocs
+```{r, echo = T, warning = F, message = F}
+res.plot[[3]]   # Blocs Xk
+```
+Cette fois ci, tous les blocs contribuent autant dans la création des deux axes
+```{R}
+plot(res.boot$bipc)                  # Importance des blocs explicatifs (seuil 1/K, K = nb blocs)
+```
+
+5 blocs X donc 1/k=20%; 0.2
+Tous les blocs ont leur IC qui passe par 0.2 cependant, deux semblent être plus importants : Facteurs infectieux et caractéristiques géneŕales.
+Le moins : biosécurité.
+
+## Variables
+```{r, echo = T, warning = F, message = F}
+res.plot[[4]]   # Variable Y
+```
+
+* axe 1 : discrimine selon eng_malade ou pas
+*axe 2 : sain ou ps_malade (sain positif, ps_malade negatif) 
+```{r}
+res.plot[[5]]   # Variables Xk
+```
+Rôle faible : T10 ps eau debi 2, x07x1_an_const4_mean_3_0
+
+Positif axe 1:
+
+Négatif axe 1:
+
+Positif axe 2:
+
+Négatif axe 2:
+
+```{r}
+plot(res.boot$vipc)                  # Importance des variables explicatives (pour tout le bloc Y ; seuil 1/P)
+plot(res.boot$XYcoef[[1]])           # Importance des variables explicatives (pour la variable y1 ; seuil 0)
+plot(res.boot$XYcoef[[2]])           # Importance des variables explicatives (pour la variable y2 ; seuil 0)
+plot(res.boot$XYcoef[[3]])           # Importance des variables explicatives (pour la variable y3 ; seuil 0)
+```  
+
+### Suppr Variables Variables Non Significatives
+
+```{r}
+toujours_0 <- tjrs_0(res.boot)
+names(toujours_0)[toujours_0]
+```
+Il n'y a donc plus de variables à supprimer.
+
+# Posar el documet dos de la profa

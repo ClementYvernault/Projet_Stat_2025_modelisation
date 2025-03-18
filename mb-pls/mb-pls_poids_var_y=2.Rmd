@@ -40,7 +40,6 @@ library(adegraphics)
 # Variables X pouvant expliquer le statut BESASP des élevages NE
 ```{r}
 donnees <- readRDS("/home/rogerbernat/Documents/Projet_Stat_2025_modelisation/data_post_etape_4_Mean.Rdata")
-
 ```
 
 -------------Mise en forme des données 

@@ -1,0 +1,923 @@
+---
+title: "PIGAL - Analyse PLS multiblocs suivie d'une classification k-means des variables respiratoires"
+author: 
+    -name : "Christelle FABLET"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+  theme: "architect"
+highlight: github
+number_sections: TRUE
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{=html}
+<style type="text/css">
+  body{
+    font-size: 5pt;
+  }
+</style>
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Packages**
+
+```{r error=FALSE, message=FALSE, warning=FALSE, include=F, eval=T}
+# chargement des packages nécessaires pour la suite
+rm(list=ls())
+library(fastDummies)
+library(ade4)
+library(factoextra)
+library(cluster)
+library(knitr)
+library(table1)
+library(FactoMineR)
+library(dplyr)
+library(writexl)
+library(adegraphics)
+library(dbscan)
+library(mclust)
+library(ggplot2)
+library(nortest)
+library(gridExtra)
+library(ks) 
+library(viridis)
+library(FNN)
+library(probout)
+library(caret)
+```
+
+**Charger les données**
+
+```{r, echo = T, warning = F, message = F, eval = T, include = F}
+
+donnees <- readRDS("/home/rogerbernat/Documents/Projet_Stat_2025_modelisation/data_post_etape_4_Mean.Rdata")
+
+```
+
+## \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+#Analyse multiblocs - 21 variables X et une variable Y
+
+## \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+data.clean = fichier contenant 21 variables X et une variable Y.
+
+
+```{r, echo = T, warning = F, message = F, eval = T, include = F}
+set.seed(1234567)
+
+# suppression variable code elevage
+data.clean <- donnees[-1]
+rownames(data.clean) <- donnees$code_elevage
+noms.ligne <- donnees$code_elevage
+for(i in 1:length(data.clean)){
+  if(is.numeric(data.clean[i]))
+  data.clean[i] <- scale(data.clean[i])
+}
+```
+
+*Etape 1* 
+
+On réalise et CODE_ELEVAGEle découpage par les blocs en accord avec le fichier variables_Sujet_22_envoi.xlsx
+
+```{r, echo = T, warning = F, message = F}
+X01_Logement_Entretien <- data.clean[, c("X22x1_LOC_INF_rec", "X07x1_AN_CONST4_mean_3", "ENG_TROU", "T13_ENG_milieuDegrad.x")]
+X02_Alimentation <- data.clean[, c("T10_PS_EauDebi_3", "T10_PS_AlimPoNourrLongpPo", "X09x3_FAB_CROISS_reg_rec")]
+X03_Gestion_Maladies <- data.clean[, c("X18x2_ABBTX_PS", "X19x2_ABB_E")]
+X04_Biosecurite <- data.clean[, c("X12x2_MAT_PC", "X12x2_MAT1FRLAV_1", "T16_BS_TenueSpeciElev", "X13x2_QUAI_t")]
+X05_Facteurs_Infectieux <- data.clean[, c("A03_Pos10sVERS", "A03_PosSeroMyAs", "A03_TxPosSero22sTgReel", "A04_My10Mfloc", "A05_TxPos10sGRIPPEReel")]
+X06_Caracteristiques_Generales <- data.clean[, c("X06x1_gene_majo_1_rec", "X25x1_ElvAlterChoiPers", "LR_LRF")]
+```
+
+*Etape 2*
+
+Création des dummy (ie binaires) variables avec le package fastDummies. La variable prise en référence correspond à celle dont l'effectif de réponse est le plus élevé.
+
+```{r, echo = T, warning = F, message = F}
+
+data <- list(X01_Logement_Entretien, X02_Alimentation, X03_Gestion_Maladies, X04_Biosecurite, X05_Facteurs_Infectieux, X06_Caracteristiques_Generales)
+
+for(i in 1:length(data)){
+  df <- data[[i]]
+  for(var in names(df)){
+    if(is.factor(df[[var]])){
+      df <- dummy_cols(df, var, remove_selected_columns = TRUE, remove_most_frequent_dummy = TRUE)
+    }
+  }
+  data[[i]] <- df
+}
+```
+
+*Etape 3* 
+La variable Y est en 3 modalités donc elle est également recodée en dummy variables selon le code indiqué ci-dessous.
+Introduction de la variable Y codée en 3 dummy (ie transformation de Y en 3 variables binaires) variables :
+
+```{r, echo = T, warning = F, message = F}
+dummy_y <- data.frame(y = data.clean$y)
+
+# Create des 3 Y
+dummy_y$sain <- as.integer(dummy_y$y == "Sain")
+dummy_y$ps_malade <- as.integer(dummy_y$y == "PS_malade")
+dummy_y$eng_malade <- as.integer(dummy_y$y == "ENG_malade")
+
+#suppression de y, la variable Y initiale, qui a été récodée en 3 niveaux Y
+```
+
+*Etape 4* 
+
+Création d'un bloc pour la variable Y codée en dummy variables.
+
+```{r}
+bloc.Y <- dummy_y[,2:4]
+data[[7]] <- bloc.Y
+```
+
+*Etape 5* 
+
+Renommer les blocs:
+
+```{r, echo = T, warning = F, message = F}
+new_names <- c("X01_Logement_Entretien", "X02_Alimentation", "X03_Gestion_Maladies", "X04_Biosecurite", "X05_Facteurs_Infectieux", "X06_Caracteristiques_Generales", "Bloc_Y")
+names(data) <- new_names
+```
+
+*Etape 6* 
+
+**PASSAGE à l'analyse mbPLS**
+
+## Préparation des données
+
+```{r, echo = T, warning = F, message = F}
+Y <- data[[7]]
+
+row.names(Y)<-rownames(data[[1]])
+#renommer les lignes du nouveau Y par les numéros des data 1 à 7 car Y prend le code elevage (PIGAL/ELEV/01...) alors que les autres fichiers ont un numéro d'ordre (perte du code_elevage); sans cela le code d'après bloque #à voir si cette étape est nécessaire dans votre code selon la configuration de votre fichier.
+dudiY.ergo <- dudi.pca(Y, center = TRUE, scale = TRUE, scannf = FALSE)
+ktabX.ergo <- ktab.list.df(data[1:6])
+```
+
+## mbPLS
+
+```{r, echo = T, warning = F, message = F}
+res.mbpls2   <- mbpls(dudiY.ergo, ktabX.ergo, scale = T, option = "uniform", scannf = FALSE, nf = 10)
+res.plot     <- plot(res.mbpls2)
+
+res.2foldcv2 <- testdim(res.mbpls2, nrepet = 500)  # calcul long
+```
+
+## Choix du nombre de dimensions
+
+```{R}
+rmsec_values <- res.2foldcv2$statsRMSEc$Mean
+rmsec_values[is.nan(rmsec_values)] <- NA
+somme <- res.2foldcv2$statsRMSEv$Mean + res.2foldcv2$statsRMSEc$Mean
+# Définir les limites de l'axe Y pour inclure les deux courbes
+#ylim_range <- range(c(res.2foldcv2$statsRMSEv$Mean, rmsec_values, somme), na.rm = TRUE)
+par(mfrow = c(1, 3))
+# Tracer la courbe d'erreur de validation (rouge)
+plot(1:length(res.2foldcv2$statsRMSEv$Mean), res.2foldcv2$statsRMSEv$Mean, type = "b", pch = 16, col = "red",
+     xlab = "Nombre de dimensions", ylab = "Erreur",
+     main = "Erreur Validation")
+
+# Ajouter la courbe d'erreur d'apprentissage (bleue)
+plot(1:length(rmsec_values), rmsec_values, type = "b", pch = 16, col = "blue",
+     xlab = "Nombre de dimensions", ylab = "Erreur",
+     main = "Erreur Apprentissage")
+
+plot(1:length(somme), somme, type = "b", pch = 16, col = "green",
+     xlab = "Nombre de dimensions", ylab = "Erreur",
+     main = "Somme des erreurs")
+
+# Sélection dimensions
+match(min(na.omit(somme)), somme)
+```
+
+NB : les variables X sont centrées et réduites à ce niveau
+On décide alors de garder 4 dimensions.
+
+# Récupération des composantes de tous les axes pour réaliser une classification k-means à partir de ces composantes
+
+```{r, echo = T, warning = F, message = F}
+#pour les X
+recup_compos_X<-res.mbpls2$lX
+#pour les Y
+recup_compos_Y<-res.mbpls2$lY
+```
+
+## Complément sur la variance expliquée des axes : variance expliquée par bloc
+
+```{r, include=F, eval=T}
+red<-rgb(1,0,0,0.5)
+orange <- rgb(1, 0.5, 0, 0.5)  
+green <- rgb(0, 0.8, 0, 0.5)
+sum_res <- summary(res.mbpls2)
+```
+```{r}
+par(mfrow = c(2, 3))
+for(name in names(sum_res)[-1]){
+    var.cum <- sum_res[[name]][,2]
+    color <- ifelse(var.cum <= 25, red, ifelse(var.cum < 30, orange, green))
+    barplot(var.cum,
+            main=name,
+            col = color,
+            cex.main=1.25,
+            cex.axis=1.2,
+            ylim= c(0,87))
+}
+
+var.cum <- sum_res$YandX[,2]
+color <- ifelse(var.cum <= 25, red, ifelse(var.cum < 30, orange, green))
+
+par(mfrow = c(1, 2))
+barplot(var.cum,
+            main="Y",
+            col = color,
+            cex.main=1.25,
+            cex.axis=1.2,
+            ylim= c(0,100))
+var.cum <- sum_res$YandX[,4]
+color <- ifelse(var.cum <= 25, red, ifelse(var.cum < 30, orange, green))
+
+barplot(var.cum,
+            main="X",
+            col = color,
+            cex.main=1.25,
+            cex.axis=1.2,
+            ylim= c(0,100))
+
+```
+
+
+## Classification
+
+L’objectif de cette approche est de regarder si de l’hétérogénéité existe au sein des niveaux de Y et que cela s’explique par des pratiques associées qui sont différentes.
+
+### K-means
+
+```{r, include=F, eval=T}
+selection_dimensions <- function(res.mbpls, n_dim){
+  #composantes du bloc X
+  data_clust <- res.mbpls[,c(1:n_dim)] #x premières composantes récupérées pour la suite de la classification
+  data_clust.scaled <- scale(data_clust) # centrer
+
+  #calculate gap statistic based on number of clusters
+  gap_stat <- clusGap(data_clust.scaled,
+                      FUN = kmeans,
+                      nstart = 25,
+                      K.max = 10,
+                      B = 150)
+
+  #plot number of clusters vs. gap statistic
+  return(fviz_gap_stat(gap_stat))
+}
+
+```
+
+```{R}
+select.4 <- selection_dimensions(recup_compos_X, 2)
+select.4
+```
+
+Il semblerait que 4 ou 2 clusters semblent ce dégager.
+
+```{r, include=F, eval=T}
+analyse_clusters <- function(res.mbpls, donnees, n_dim, centers){
+  data_clust <- res.mbpls[,c(1:n_dim)] #x premières composantes récupérées pour la suite de la classification
+  data_clust.scaled <- scale(data_clust) # centrer
+
+
+  #perform k-means clustering with k = x clusters (x=centers)
+  res.km <- kmeans(data_clust.scaled, centers = centers, nstart = 25)
+
+
+  #plot results of final k-means model
+  resultat.2dim <- fviz_cluster(res.km, data = data_clust.scaled,
+              geom = "point",
+              ellipse.type = "convex", 
+              ggtheme = theme_bw()
+              )
+
+  data.avec_cl <- cbind(donnees, res.km$cluster)
+  nom.clust <- paste0("cluster_km", n_dim)
+  names(data.avec_cl) <- c(names(donnees), nom.clust)
+
+  data.avec_clb <- data.frame(data.avec_cl)
+
+  #déclarer la variable cluster_km en facteur
+  data.avec_clb[[nom.clust]] <- as.factor(data.avec_clb[[nom.clust]])
+
+  data.table <- kable(table1(as.formula(paste("~ . |", nom.clust)), data = data.avec_clb))
+
+  data.dsc <- catdes(data.avec_clb, num.var = ncol(data.avec_clb), proba =0.05)$category
+
+  
+
+  cluster_list <- list()
+  for (i in 1:centers) {
+    cluster_list[[paste("cluster", i, sep = "_")]] <- as.data.frame(data.dsc[[as.character(i)]])
+    cluster_list[[paste("cluster", i, sep = "_")]] <- as.data.frame(cluster_list[[paste("cluster", i, sep = "_")]], rownames = "Variable")
+  }
+  file_path <- paste0("mb-pls/Clusters_km", paste0(n_dim, ".xlsx"))
+  # write_xlsx(cluster_list, file_path, col_names = TRUE, format_headers = TRUE, use_zip64 = FALSE)
+  
+  return(list("res.km"=res.km,
+               "plot.km"=resultat.2dim,
+               "res.table"=data.table,
+               "res.catdes"=data.dsc))
+
+}
+```
+```{R}
+res.4.2 <- analyse_clusters(recup_compos_X, data.clean, 4, 2)
+res.4.2$plot.km
+res.4.2$res.table
+res.4.2$res.catdes
+```
+
+Les blocs ne sont pas caractérisées par la variable y.
+
+```{R}
+res.4.4 <- analyse_clusters(recup_compos_X, data.clean, 4, 4)
+res.4.4$plot.km
+res.4.4$res.table
+res.4.4$res.catdes
+```
+
+___ ENG_malade (blocs 2 et 4) ___
+
+Le cluster 4 est fortement lié à ENG_malade (66,7 % des cas), caractérisé par une utilisation systématique d’antibiotiques contre la toux (X18x2_ABBTX_PS=1, v.test=8,46) et une antibiorésistance proactive en engraissement (X19x2_ABB_E=1, v.test=4,97). Ces élevages présentent également des trous dans les cloisons (ENG_TROU=1, v.test=4,07) et un nettoyage rare du quai d’embarquement (X13x2_QUAI_t=0, v.test=2,45), combinés à des sols dégradés (T13_ENG_milieuDegrad.x=1, v.test=2,02). Paradoxalement, certains sont labellisés Label Rouge (LR_LRF=1, v.test=3,12), soulignant un décalage entre certification et conditions réelles. Le cluster 2, bien que moins marqué (46,2 % ENG_malade), montre une prévalence élevée d’helminthes (A03_Pos10sVERS=1, v.test=2,25) et une fabrication en usine d’aliments "croissance" (X09x3_FAB_CROISS_reg_rec=1, v.test=2,83), suggérant des risques sanitaires liés à l’alimentation et aux parasites.
+
+___ PS_malade (blocs 1 et 2) ___
+
+Le cluster 1 est marqué par une absence d’antibiotiques préventifs (X19x2_ABB_E=0, v.test=4,32 ; X18x2_ABBTX_PS=0, v.test=3,78) et une utilisation d’aliments locaux (X09x3_FAB_CROISS_reg_rec=0, v.test=3,25), associés à 33,3 % de PS_malade. Ces élevages ont un débit d’eau fort (T10_PS_EauDebi_3=2, v.test=2,89) et un matériel partagé lavé au moins une fois par semaine (X12x2_MAT1FRLAV_1=0, v.test=2,90), favorisant les infections respiratoires. Le cluster 2 (46,2 % PS_malade) combine une génétique majoritaire largewhite landrace (X06x1_gene_majo_1_rec=1, v.test=2,32) et pas de trou dans les cloisons (ENG_TROU=0, v.test=3,61), malgré un nettoyage fréquent du quai (X13x2_QUAI_t=1, v.test=1,96).
+
+___ Sain (blocs 1 et 3) ___
+
+Le cluster 3 se distingue par une hygiène irréprochable : tenue spécifique systématique (T16_BS_TenueSpeciElev=1, v.test=2,10), débit d’eau modéré (T10_PS_EauDebi_3=1, v.test=2,84), et usage d’antibiotiques en cas de besoin (X19x2_ABB_E=1, v.test=3,36). Ces élevages utilisent les aliments locaux (X09x3_FAB_CROISS_reg_rec=0, v.test=2,05). Le cluster 1, bien que mixte (55,6 % Sain), montre des pratiques contradictoires : absence d’antibiotiques préventifs (X19x2_ABB_E=0) mais pas de lavage du matériel partagée (X12x2_MAT1FRLAV_1=2, v.test=2,43), expliquant sa résilience partielle.
+
+___ Remarque ___
+
+Le cluster 1 mélange caractéristiques saines (55,6 % Sain) et risques (33,3 % PS_malade). Cette dualité s’explique par des variables opposées : X09x3_FAB_CROISS_reg_rec=0 (aliments locales) contre X19x2_ABB_E=0 (absence d’antibiotiques préventifs). Ce profil suggère des élevages en transition, adoptant partiellement des bonnes pratiques sans maîtriser tous les risques.
+Le cluster 2 quand à lui mélange des caractéristiques de PS_malade et ENG_malade.
+
+### Hdbscan
+
+```{r, include=F, eval=T}
+clasif.hdbscan <- function(res.mbpls, n_dim) {
+  # Extract the first n_dim components from the res.mbpls object
+  data_clust <- res.mbpls[, c(1:n_dim)]
+  data_clust.scaled <- scale(data_clust)  # Scale the data
+
+  # Apply HDBSCAN clustering
+  hdbscan_result <- hdbscan(data_clust.scaled, minPts = 5)  # minPts is a key parameter for HDBSCAN
+
+  # Visualize the clustering results
+  plot(data_clust.scaled, col = hdbscan_result$cluster + 1, pch = 20, main = "HDBSCAN Clustering")
+  legend("topright", legend = unique(hdbscan_result$cluster), col = unique(hdbscan_result$cluster + 1), pch = 20)
+
+  # Return the HDBSCAN result for further inspection
+  return(hdbscan_result)
+}
+```
+```{R}
+res.hdb.4 <- clasif.hdbscan(recup_compos_X, 4)
+res.hdb.4
+```
+
+56 élevages non pris classifiés.
+
+### Modèle de mèlanges gaussien
+
+Justification choix de modèle : 
+* Contrairement à k-NN, qui se base uniquement sur la proximité des points dans l'espace, GMM peut mieux gérer les cas où les classes ne sont pas séparées de manière nette mais ont des distributions chevauchantes.
+* moins suceptible au fléau de a dimension que knn
+* On ne suppose rien : volume, orientation, variance 
+### 2 dimensions
+```{R}
+# Load latent components
+X.2 <- res.mbpls2$lX[, 1:3]  # Ensure this is a numeric matrix/data.frame
+
+# Fit models and select best using BIC
+fit <- Mclust(X.2, G = 1:10)
+plot(fit, "BIC")
+```
+### 3 dimensions
+
+```{R}
+# Load latent components
+X.2 <- res.mbpls2$lX[, 1:3]  # Ensure this is a numeric matrix/data.frame
+
+# Fit models and select best using BIC
+fit <- Mclust(X.2, G = 1:10)
+plot(fit, "BIC")
+gmm_model <- Mclust(X.2, G = 3, "EEE")
+
+
+clusters <- gmm_model$classification
+summary(factor(clusters))
+
+# Création de la grille 2D avec noms originaux
+original_names <- colnames(recup_compos_X)[1:2]
+
+grid <- expand.grid(
+  seq(min(X.2[,1]), max(X.2[,1]), length.out = 100),
+  seq(min(X.2[,2]), max(X.2[,2]), length.out = 100),
+  median(X.2[,3])
+)
+colnames(grid) <- original_names
+
+# Prédiction
+grid_probs <- predict(gmm_model, newdata = grid)$z
+
+plot_func <- function(cluster){
+  grid$prob_cluster1 <- grid_probs[,cluster]
+    
+  # Données pour les points
+  plot_data <- data.frame(
+    X.2[,1:2], 
+    y_malade = factor(data.clean$y, levels = c("ENG_malade", "PS_malade", "Sain"))
+  )
+  colnames(plot_data)[1:2] <- original_names[1:2]
+
+  # Plot avec noms corrigés
+  ggplot(grid, aes_string(x = original_names[1], y = original_names[2])) +
+    geom_raster(aes(fill = prob_cluster1), interpolate = TRUE) +
+    geom_contour(aes(z = prob_cluster1), color = "black", bins = 10) +
+    scale_fill_gradient(low = rgb(0,0.8,0,0.3), high = rgb(1,0,0,0.15)) +
+    geom_point(
+      data = plot_data, 
+      aes_string(x = original_names[1], y = original_names[2], color = "y_malade"),
+      size = 1.75
+    ) +
+    scale_color_manual(
+    values = c("ENG_malade" = "#A52A2A", "PS_malade" = "#CD6600", "Sain" = "#458B74")
+    ) +
+    labs(x = "Axe 1 mb-pls", y = "Axe 2 mb-pls") +
+    theme_minimal()
+}
+plot_func(1)
+plot_func(2)
+plot_func(3)
+
+res.mb <- data.frame(cbind(X.4, factor(clusters)))
+colnames(res.mb) <- c("Ax1", "Ax2", "Ax3", "clust")
+for (j in 1:3){
+  for (i in 1:3) {
+  test_normality(res.mb[res.mb$clust==j,][, i], paste("Component", i))
+  }
+}
+
+data_with_clusters <- data.frame(data.clean, clusters = factor(clusters))
+
+# 2. Create the formula
+# Use "~ . | clusters" to summarize all variables grouped by clusters
+formula <- as.formula(~ . | clusters)
+
+# 3. Generate the table
+data.table <- table1(formula, data = data_with_clusters)
+
+# 4. Format with kable (if needed)
+kable_table <- kable(data.table)
+kable_table
+
+data.dsc <- catdes(data_with_clusters, num.var = ncol(data_with_clusters), proba =0.05)$category
+data.dsc
+```
+### VEE
+```{r}
+gmm_model <- Mclust(X.2, G = 3, "VEE")
+
+clusters <- gmm_model$classification
+summary(factor(clusters))
+
+# Création de la grille 2D avec noms originaux
+original_names <- colnames(recup_compos_X)[1:2]
+
+grid <- expand.grid(
+  seq(min(X.2[,1]), max(X.2[,1]), length.out = 100),
+  seq(min(X.2[,2]), max(X.2[,2]), length.out = 100),
+  median(X.2[,3])
+)
+colnames(grid) <- original_names
+
+# Prédiction
+grid_probs <- predict(gmm_model, newdata = grid)$z
+
+plot_func(1)
+plot_func(2)
+plot_func(3)
+
+res.mb <- data.frame(cbind(X.4, factor(clusters)))
+colnames(res.mb) <- c("Ax1", "Ax2", "Ax3", "clust")
+for (j in 1:3){
+  for (i in 1:3) {
+  test_normality(res.mb[res.mb$clust==j,][, i], paste("Component", i))
+  }
+}
+
+data_with_clusters <- data.frame(data.clean, clusters = factor(clusters))
+
+# 2. Create the formula
+# Use "~ . | clusters" to summarize all variables grouped by clusters
+formula <- as.formula(~ . | clusters)
+
+# 3. Generate the table
+data.table <- table1(formula, data = data_with_clusters)
+
+# 4. Format with kable (if needed)
+kable_table <- kable(data.table)
+kable_table
+
+data.dsc <- catdes(data_with_clusters, num.var = ncol(data_with_clusters), proba =0.05)$category
+data.dsc
+```
+
+### 4 dimensions
+
+```{R}
+
+# Load latent components
+X.4 <- res.mbpls2$lX[, 1:4]  # Ensure this is a numeric matrix/data.frame
+# Fit models and select best using BIC
+results <- data.frame(
+  Model = character(),
+  G = numeric(),
+  LogLik = numeric()
+)
+
+# Get all model names
+model_names <- c("EII", "VII", "EEI", "VEI", "EVI", "VVI", "EEE", "EVE", "VEV", "VVV", "VEE")
+
+# Loop through models and cluster numbers
+for(model in model_names) {
+  for(g in 1:10) {
+    # Fit model
+    fit <- Mclust(X.4, G = g, modelNames = model)
+    
+    # Store results if model converged
+    if(!is.null(fit$loglik)) {
+      results <- rbind(results, data.frame(
+        Model = model,
+        G = g,
+        LogLik = fit$loglik
+      ))
+    }
+  }
+}
+
+# Create the plot
+ggplot(results, aes(x = G, y = LogLik, color = Model)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = 1:10) +
+  labs(title = "Log-Likelihood by Model and Number of Clusters",
+       x = "Number of Clusters (G)",
+       y = "Log-Likelihood") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# Optional: Facet by model for better readability
+ggplot(results, aes(x = G, y = LogLik)) +
+  geom_line(color = "blue", linewidth = 1) +
+  geom_point(color = "red", size = 2) +
+  facet_wrap(~ Model, scales = "free_y") +
+  scale_x_continuous(breaks = 1:10) +
+  labs(title = "Log-Likelihood by Model and Number of Clusters",
+       x = "Number of Clusters (G)",
+       y = "Log-Likelihood") +
+  theme_minimal()
+```
+```{R}
+models <- Mclust(X.4, G = 1:10)
+plot(models, "BIC")
+```
+
+Meilleur modèle : EEE, G = 3. 
+Deuxième meilleur: VEE, G=3.
+
+# EEE
+
+```{R}
+# Choix nombre clusters
+gmm_model <- Mclust(X.4, G = 3, modelNames = "EEE")
+
+clusters <- gmm_model$classification
+summary(factor(clusters))
+
+# Création de la grille 2D avec noms originaux
+original_names <- colnames(recup_compos_X)[1:2]
+
+grid <- expand.grid(
+  seq(min(X.4[,1]), max(X.4[,1]), length.out = 100),
+  seq(min(X.4[,2]), max(X.4[,2]), length.out = 100),
+  median(X.4[,3]),
+  median(X.4[,4])
+)
+colnames(grid) <- original_names
+
+# Prédiction
+grid_probs <- predict(gmm_model, newdata = grid)$z
+grid$prob_cluster1 <- grid_probs[,1]
+
+# Données pour les points
+plot_data <- data.frame(
+  X.4[,1:2], 
+  y_malade = factor(data.clean$y, levels = c("ENG_malade", "PS_malade", "Sain"))
+)
+colnames(plot_data)[1:2] <- original_names[1:2]
+
+# Plot avec noms corrigés
+ggplot(grid, aes_string(x = original_names[1], y = original_names[2])) +
+  geom_raster(aes(fill = prob_cluster1), interpolate = TRUE) +
+  geom_contour(aes(z = prob_cluster1), color = "black", bins = 10) +
+  scale_fill_gradient(low = rgb(0,0.8,0,0.3), high = rgb(1,0,0,0.15)) +
+  geom_point(
+    data = plot_data, 
+    aes_string(x = original_names[1], y = original_names[2], color = "y_malade"),
+    size = 1.75
+  ) +
+  scale_color_manual(
+    values = c("ENG_malade" = "#A52A2A", "PS_malade" = "#CD6600", "Sain" = "#458B74")
+  ) +
+  labs(x = "Axe 1 mb-pls", y = "Axe 2 mb-pls") +
+  theme_minimal()
+
+grid$prob_cluster1 <- grid_probs[,2]
+
+# Données pour les points
+plot_data <- data.frame(
+  X.4[,1:2], 
+  y_malade = factor(data.clean$y, levels = c("ENG_malade", "PS_malade", "Sain"))
+)
+colnames(plot_data)[1:2] <- original_names[1:2]
+
+# Plot avec noms corrigés
+ggplot(grid, aes_string(x = original_names[1], y = original_names[2])) +
+  geom_raster(aes(fill = prob_cluster1), interpolate = TRUE) +
+  geom_contour(aes(z = prob_cluster1), color = "black", bins = 10) +
+  scale_fill_gradient(low = rgb(0,0.8,0,0.3), high = rgb(1,0,0,0.15)) +
+  geom_point(
+    data = plot_data, 
+    aes_string(x = original_names[1], y = original_names[2], color = "y_malade"),
+    size = 1.75
+  ) +
+  scale_color_manual(
+    values = c("ENG_malade" = "#A52A2A", "PS_malade" = "#CD6600", "Sain" = "#458B74")
+  ) +
+  labs(x = "Axe 1 mb-pls", y = "Axe 2 mb-pls") +
+  theme_minimal()
+
+grid$prob_cluster1 <- grid_probs[,3]
+
+# Données pour les points
+plot_data <- data.frame(
+  X.4[,1:2], 
+  y_malade = factor(data.clean$y, levels = c("ENG_malade", "PS_malade", "Sain"))
+)
+colnames(plot_data)[1:2] <- original_names[1:2]
+
+# Plot avec noms corrigés
+ggplot(grid, aes_string(x = original_names[1], y = original_names[2])) +
+  geom_raster(aes(fill = prob_cluster1), interpolate = TRUE) +
+  geom_contour(aes(z = prob_cluster1), color = "black", bins = 10) +
+  scale_fill_gradient(low = rgb(0,0.8,0,0.3), high = rgb(1,0,0,0.15)) +
+  geom_point(
+    data = plot_data, 
+    aes_string(x = original_names[1], y = original_names[2], color = "y_malade"),
+    size = 1.75
+  ) +
+  scale_color_manual(
+    values = c("ENG_malade" = "#A52A2A", "PS_malade" = "#CD6600", "Sain" = "#458B74")
+  ) +
+  labs(x = "Axe 1 mb-pls", y = "Axe 2 mb-pls") +
+  theme_minimal()
+```
+
+### Test des hyp : Normalité
+```{R}
+test_normality <- function(component, comp_name) {
+  
+  qqnorm(component, main = paste("Q-Q Plot of", comp_name))
+  qqline(component, col = "red", lwd = 2)
+  
+  shapiro_test <- shapiro.test(component)
+  print(paste(comp_name, "Shapiro-Wilk test p-value:", shapiro_test$p.value))
+}
+
+# Normalité des clusters
+res.mb <- data.frame(cbind(X.4, factor(clusters)))
+colnames(res.mb) <- c("Ax1", "Ax2", "Ax3", "Ax4", "clust")
+for (j in 1:3){
+  for (i in 1:4) {
+  test_normality(res.mb[res.mb$clust==j,][, i], paste("Component", i))
+  }
+}
+
+data_with_clusters <- data.frame(data.clean, clusters = factor(clusters))
+
+# 2. Create the formula
+# Use "~ . | clusters" to summarize all variables grouped by clusters
+formula <- as.formula(~ . | clusters)
+
+# 3. Generate the table
+data.table <- table1(formula, data = data_with_clusters)
+
+# 4. Format with kable (if needed)
+kable_table <- kable(data.table)
+kable_table
+
+data.dsc <- catdes(data_with_clusters, num.var = ncol(data_with_clusters), proba =0.05)$category
+data.dsc
+```
+
+
+# VEE
+
+```{R}
+# Choix nombre clusters
+gmm_model <- Mclust(X.4, G = 5, modelNames = "EVE")
+
+clusters <- gmm_model$classification
+summary(factor(clusters))
+
+# Création de la grille 2D avec noms originaux
+original_names <- colnames(recup_compos_X)[1:2]
+
+grid <- expand.grid(
+  seq(min(X.4[,1]), max(X.4[,1]), length.out = 100),
+  seq(min(X.4[,2]), max(X.4[,2]), length.out = 100),
+  median(X.4[,3]),
+  median(X.4[,4])
+)
+colnames(grid) <- original_names
+
+# Prédiction
+grid_probs <- predict(gmm_model, newdata = grid)$z
+grid$prob_cluster1 <- grid_probs[,1]
+
+# Données pour les points
+plot_data <- data.frame(
+  X.4[,1:2], 
+  y_malade = factor(data.clean$y, levels = c("ENG_malade", "PS_malade", "Sain"))
+)
+colnames(plot_data)[1:2] <- original_names[1:2]
+
+# Plot avec noms corrigés
+ggplot(grid, aes_string(x = original_names[1], y = original_names[2])) +
+  geom_raster(aes(fill = prob_cluster1), interpolate = TRUE) +
+  geom_contour(aes(z = prob_cluster1), color = "black", bins = 10) +
+  scale_fill_gradient(low = rgb(0,0.8,0,0.3), high = rgb(1,0,0,0.15)) +
+  geom_point(
+    data = plot_data, 
+    aes_string(x = original_names[1], y = original_names[2], color = "y_malade"),
+    size = 1.75
+  ) +
+  scale_color_manual(
+    values = c("ENG_malade" = "#A52A2A", "PS_malade" = "#CD6600", "Sain" = "#458B74")
+  ) +
+  labs(x = "Axe 1 mb-pls", y = "Axe 2 mb-pls") +
+  theme_minimal()
+
+grid$prob_cluster1 <- grid_probs[,2]
+
+# Données pour les points
+plot_data <- data.frame(
+  X.4[,1:2], 
+  y_malade = factor(data.clean$y, levels = c("ENG_malade", "PS_malade", "Sain"))
+)
+colnames(plot_data)[1:2] <- original_names[1:2]
+
+# Plot avec noms corrigés
+ggplot(grid, aes_string(x = original_names[1], y = original_names[2])) +
+  geom_raster(aes(fill = prob_cluster1), interpolate = TRUE) +
+  geom_contour(aes(z = prob_cluster1), color = "black", bins = 10) +
+  scale_fill_gradient(low = rgb(0,0.8,0,0.3), high = rgb(1,0,0,0.15)) +
+  geom_point(
+    data = plot_data, 
+    aes_string(x = original_names[1], y = original_names[2], color = "y_malade"),
+    size = 1.75
+  ) +
+  scale_color_manual(
+    values = c("ENG_malade" = "#A52A2A", "PS_malade" = "#CD6600", "Sain" = "#458B74")
+  ) +
+  labs(x = "Axe 1 mb-pls", y = "Axe 2 mb-pls") +
+  theme_minimal()
+
+grid$prob_cluster1 <- grid_probs[,3]
+
+# Données pour les points
+plot_data <- data.frame(
+  X.4[,1:2], 
+  y_malade = factor(data.clean$y, levels = c("ENG_malade", "PS_malade", "Sain"))
+)
+colnames(plot_data)[1:2] <- original_names[1:2]
+
+# Plot avec noms corrigés
+ggplot(grid, aes_string(x = original_names[1], y = original_names[2])) +
+  geom_raster(aes(fill = prob_cluster1), interpolate = TRUE) +
+  geom_contour(aes(z = prob_cluster1), color = "black", bins = 10) +
+  scale_fill_gradient(low = rgb(0,0.8,0,0.3), high = rgb(1,0,0,0.15)) +
+  geom_point(
+    data = plot_data, 
+    aes_string(x = original_names[1], y = original_names[2], color = "y_malade"),
+    size = 1.75
+  ) +
+  scale_color_manual(
+    values = c("ENG_malade" = "#A52A2A", "PS_malade" = "#CD6600", "Sain" = "#458B74")
+  ) +
+  labs(x = "Axe 1 mb-pls", y = "Axe 2 mb-pls") +
+  theme_minimal()
+grid$prob_cluster1 <- grid_probs[,4]
+
+# Données pour les points
+plot_data <- data.frame(
+  X.4[,1:2], 
+  y_malade = factor(data.clean$y, levels = c("ENG_malade", "PS_malade", "Sain"))
+)
+colnames(plot_data)[1:2] <- original_names[1:2]
+
+# Plot avec noms corrigés
+ggplot(grid, aes_string(x = original_names[1], y = original_names[2])) +
+  geom_raster(aes(fill = prob_cluster1), interpolate = TRUE) +
+  geom_contour(aes(z = prob_cluster1), color = "black", bins = 10) +
+  scale_fill_gradient(low = rgb(0,0.8,0,0.3), high = rgb(1,0,0,0.15)) +
+  geom_point(
+    data = plot_data, 
+    aes_string(x = original_names[1], y = original_names[2], color = "y_malade"),
+    size = 1.75
+  ) +
+  scale_color_manual(
+    values = c("ENG_malade" = "#A52A2A", "PS_malade" = "#CD6600", "Sain" = "#458B74")
+  ) +
+  labs(x = "Axe 1 mb-pls", y = "Axe 2 mb-pls") +
+  theme_minimal()
+grid$prob_cluster1 <- grid_probs[,5]
+
+# Données pour les points
+plot_data <- data.frame(
+  X.4[,1:2], 
+  y_malade = factor(data.clean$y, levels = c("ENG_malade", "PS_malade", "Sain"))
+)
+colnames(plot_data)[1:2] <- original_names[1:2]
+
+# Plot avec noms corrigés
+ggplot(grid, aes_string(x = original_names[1], y = original_names[2])) +
+  geom_raster(aes(fill = prob_cluster1), interpolate = TRUE) +
+  geom_contour(aes(z = prob_cluster1), color = "black", bins = 10) +
+  scale_fill_gradient(low = rgb(0,0.8,0,0.3), high = rgb(1,0,0,0.15)) +
+  geom_point(
+    data = plot_data, 
+    aes_string(x = original_names[1], y = original_names[2], color = "y_malade"),
+    size = 1.75
+  ) +
+  scale_color_manual(
+    values = c("ENG_malade" = "#A52A2A", "PS_malade" = "#CD6600", "Sain" = "#458B74")
+  ) +
+  labs(x = "Axe 1 mb-pls", y = "Axe 2 mb-pls") +
+  theme_minimal()
+```
+
+### Test des hyp : Normalité
+```{R}
+test_normality <- function(component, comp_name) {
+  
+  qqnorm(component, main = paste("Q-Q Plot of", comp_name))
+  qqline(component, col = "red", lwd = 2)
+  
+  shapiro_test <- shapiro.test(component)
+  print(paste(comp_name, "Shapiro-Wilk test p-value:", shapiro_test$p.value))
+}
+
+# Normalité des clusters
+res.mb <- data.frame(cbind(X.4, factor(clusters)))
+colnames(res.mb) <- c("Ax1", "Ax2", "Ax3", "Ax4", "clust")
+for (j in 1:3){
+  for (i in 1:4) {
+  test_normality(res.mb[res.mb$clust==j,][, i], paste("Component", i))
+  }
+}
+
+data_with_clusters <- data.frame(data.clean, clusters = factor(clusters))
+
+# 2. Create the formula
+# Use "~ . | clusters" to summarize all variables grouped by clusters
+formula <- as.formula(~ . | clusters)
+
+# 3. Generate the table
+data.table <- table1(formula, data = data_with_clusters)
+
+# 4. Format with kable (if needed)
+kable_table <- kable(data.table)
+kable_table
+
+data.dsc <- catdes(data_with_clusters, num.var = ncol(data_with_clusters), proba =0.05)$category
+data.dsc
+```
+
+Clusters pas trés interpretables suivant y.
