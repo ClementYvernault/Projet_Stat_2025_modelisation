@@ -11,25 +11,24 @@ knitr::opts_chunk$set(echo = TRUE)
 rm(list=ls())
 
 # chargement des données 
-donnees_forest <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Forest.Rdata", "rb")
 donnees_mean <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Mean.Rdata", "rb")
 
 ```
 =======
 Blocs_Y_76X01_X07
 >>>>>>> 793ef1d9fec51ef1276e9d9f0e638ab56804269f
-# on commence par travailler avec donnees_forest
-colnames(donnees_forest)
+# on commence par travailler avec donnees_mean
+colnames(donnees_mean)
 library(caret)
 set.seed(36)
-train_index <- createDataPartition(donnees_forest$y, p = 0.8, list = FALSE)
+train_index <- createDataPartition(donnees_mean$y, p = 0.8, list = FALSE)
 
 # Diviser les données en train et test
 ```{r}
-donnees_forest2 <- donnees_forest[,-1]
-train_data <- donnees_forest[train_index, ]
+donnees_mean2 <- donnees_mean[,-1]
+train_data <- donnees_mean[train_index, ]
 train_data <- train_data[,-1]
-test_data <- donnees_forest[-train_index, ]
+test_data <- donnees_mean[-train_index, ]
 ```
 
 # Vérifier les proportions dans les deux ensembles
@@ -41,11 +40,11 @@ On s'interesse aux problèmes de séparation parfaite.
 Il n'y a pas de problème pour les variables catégorielles car on a déjà vérfié les proportions.
 ```{r}
 # Sélectionner uniquement les variables explicatives
-vars_explicatives <- names(donnees_forest)[!names(donnees_forest) %in% "y"]
+vars_explicatives <- names(donnees_mean2)[!names(donnees_mean2) %in% "y"]
 
 # Boucle pour vérifier la séparation parfaite
 for (var in vars_explicatives) {
-  tab <- table(donnees_forest$y, donnees_forest[[var]])
+  tab <- table(donnees_mean2$y, donnees_mean[[var]])
   
   # Vérifie si une modalité d'une variable prédit toujours une seule classe de y
   if (any(rowSums(tab == 0) == (nrow(tab) - 1))) {
@@ -72,21 +71,21 @@ Il faut donc supprimer l'individu ou la variable. Una valeur trop élevé -> sai
 library(VGAM)  # Pour la régression multinomiale
 
 # Sélectionner uniquement les variables quantitatives
-vars_quanti <- names(donnees_forest)[sapply(donnees_forest, is.numeric)]
+vars_quanti <- names(donnees_mean2)[sapply(donnees_mean2, is.numeric)]
 
 for (var in vars_quanti) {
   cat("\n🔹 Test de la variable :", var, "\n")
   
   # Modèle de régression multinomiale
   formula <- as.formula(paste("y ~", var))
-  model <- vglm(formula, family = multinomial, data = donnees_forest)
+  model <- vglm(formula, family = multinomial, data = donnees_mean)
 
   # Extraire les coefficients
   coef_val <- coef(model)
   
   # Vérifier si certains coefficients sont très grands (seuil arbitraire)
   if (any(abs(coef_val) > 10)) {
-    cat("⚠️ Alerte : Problème de séparation possible ! Coefficients élevés pour", var, "\n")
+    cat("⚠️ Ale/rte : Problème de séparation possible ! Coefficients élevés pour", var, "\n")
   }
 
   # Vérifier les fitted probabilities
@@ -95,7 +94,7 @@ for (var in vars_quanti) {
     cat("⚠️ Alerte : Problème de fitted probabilities proches de 0 ou 1 pour", var, "\n")
     print(fitted_probs)
   }
-}
+} 
 
 ```
 
@@ -104,16 +103,16 @@ On va recoder la variable en 3 modalités
 library(ggplot2)
 
 # Afficher la distribution sous forme de table pour voir les valeurs distinctes
-table(donnees_forest$A04_My10Mfloc)
+table(donnees_mean$A04_My10Mfloc)
 
 # Affichage graphique
-ggplot(donnees_forest, aes(x = as.factor(A04_My10Mfloc))) +
+ggplot(donnees_mean, aes(x = as.factor(A04_My10Mfloc))) +
   geom_bar(fill = "steelblue", color = "black") +
   theme_minimal() +
   labs(title = "Distribution de A04_My10Mfloc (discrète)")
 
 # Trier les valeurs distinctes et leurs effectifs
-effectifs <- as.data.frame(table(donnees_forest$A04_My10Mfloc))
+effectifs <- as.data.frame(table(donnees_mean$A04_My10Mfloc))
 colnames(effectifs) <- c("valeur", "effectif")
 effectifs$valeur <- as.numeric(as.character(effectifs$valeur))  # Conversion en numérique si besoin
 effectifs <- effectifs[order(effectifs$valeur), ]
@@ -126,21 +125,21 @@ effectifs$cumule <- cumsum(effectifs$effectif) / total_effectif  # Fréquence cu
 seuil_eleve <- min(effectifs$valeur[effectifs$cumule >= 0.85])
 
 # Définition des 3 groupes en fonction de cette coupure
-donnees_forest$A04_My10Mfloc <- cut(
-  donnees_forest$A04_My10Mfloc,
+donnees_mean$A04_My10Mfloc <- cut(
+  donnees_mean$A04_My10Mfloc,
   breaks = c(-Inf, 0, seuil_eleve, Inf),
   labels = c("zero", "moyen", "élevé")
 )
 
 # Transformer en facteur
-donnees_forest$A04_My10Mfloc <- as.factor(donnees_forest$A04_My10Mfloc)
+donnees_mean$A04_My10Mfloc <- as.factor(donnees_mean$A04_My10Mfloc)
 
 # Vérification de la répartition des classes
-table(donnees_forest$A04_My10Mfloc)
-prop.table(table(donnees_forest$A04_My10Mfloc))
+table(donnees_mean$A04_My10Mfloc)
+prop.table(table(donnees_mean$A04_My10Mfloc))
 
 # Affichage graphique après transformation
-ggplot(donnees_forest, aes(x = A04_My10Mfloc)) +
+ggplot(donnees_mean, aes(x = A04_My10Mfloc)) +
   geom_bar(fill = "darkorange", color = "black") +
   theme_minimal() +
   labs(title = "Distribution de A04_My10Mfloc après transformation en factor : seuil = 43839")
@@ -149,36 +148,99 @@ ggplot(donnees_forest, aes(x = A04_My10Mfloc)) +
 
 ```{r}
 set.seed(36)
-train_index <- createDataPartition(donnees_forest$y, p = 0.8, list = FALSE)
-train_data <- donnees_forest[train_index, ]
-test_data <- donnees_forest[-train_index, ]
+train_index <- createDataPartition(donnees_mean$y, p = 0.8, list = FALSE)
+train_data <- donnees_mean[train_index, ]
+test_data <- donnees_mean[-train_index, ]
 
 library("VGAM")
-multinomial_logistic_model <- vglm(y ~ . ,data = train_data, family = multinomial)
+multinomial_logistic_model <- vglm(y ~ . ,data = donnees_mean2, family = multinomial)
 ```
 # analyse
 ```{r}
 
 summary(multinomial_logistic_model)
+
+# Vérification avec les p-values
+anova(multinomial_logistic_model)
+library(MASS)
+install.packages("caret")
+library(car)
+library(caret)
+# Suppression des variables non significatives (si nécessaire)
+modele_reduit <- vglm(y ~ X09x3_FAB_CROISS_reg_rec +
+                        X22x1_LOC_INF_rec +
+                        X06x1_gene_majo_1_rec +
+                        X12x2_MAT_PC +
+                        T10_PS_EauDebi_3 +
+                        X07x1_AN_CONST4_mean_3 +
+                        LR_LRF +
+                        T13_ENG_milieuDegrad.x +
+                        X19x2_ABB_E +
+                        A03_Pos10sVERS +
+                        A03_PosSeroMyAs +
+                        A03_TxPosSero22sTgReel, 
+                      family = multinomial, data = donnees_mean2)
+
+modele_reduit2 <- vglm(y ~ X09x3_FAB_CROISS_reg_rec +
+                        X06x1_gene_majo_1_rec +
+                        X12x2_MAT_PC +
+                        T10_PS_EauDebi_3 +
+                        X07x1_AN_CONST4_mean_3 +
+                        LR_LRF +
+                        T13_ENG_milieuDegrad.x +
+                        A03_Pos10sVERS +
+                        A03_PosSeroMyAs +
+                        A03_TxPosSero22sTgReel, 
+                      family = multinomial, data = donnees_mean2)
+
+summary(modele_reduit)
+summary(modele_reduit2)
+
+anova(modele_reduit)
+anova(modele_reduit2)
+
+AIC(multinomial_logistic_model)
+AIC(modele_reduit)
+AIC(modele_reduit2)
+
+
+
+
+
+# Vérification de la non-corrélation résidus-prédictions
+residus <- residuals(modele_reduit, type = "pearson")
+predictions <- predict(modele_reduit, type = "response")
+
+plot(predictions, residus, main = "Résidus vs Prédictions", xlab = "Prédictions", ylab = "Résidus")
+
+# Homoscédasticité : Test de Breusch-Pagan
+bptest(modele_reduit)
+
+# Autocorrélation temporelle : Test de Durbin-Watson
+dwtest(modele_reduit)
 ```
+
+
+
+
 ```{r}
 # Charger la librairie dplyr si ce n'est pas déjà fait
 library(dplyr)
 
 # Supprimer les variables spécifiques de la base de données
-donnees_forest <- donnees_forest %>%
+donnees_mean <- donnees_mean %>%
   select(-"X07x1_AN_CONST4_mean_3", 
          -"T16_BS_TenueSpeciElev", 
          -"LR_LRF", 
          -"T10_PS_AlimPoNourrLongpPo")
 
 # Vérifier les nouvelles colonnes de la base de données
-colnames(donnees_forest)
+colnames(donnees_mean)
 
 set.seed(36)
-train_index <- createDataPartition(donnees_forest$y, p = 0.8, list = FALSE)
-train_data <- donnees_forest[train_index, ]
-test_data <- donnees_forest[-train_index, ]
+train_index <- createDataPartition(donnees_mean$y, p = 0.8, list = FALSE)
+train_data <- donnees_mean[train_index, ]
+test_data <- donnees_mean[-train_index, ]
 
 library("VGAM")
 multinomial_logistic_model <- vglm(y ~ . ,data = train_data, family = multinomial)
