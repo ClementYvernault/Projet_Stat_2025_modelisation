@@ -3,26 +3,51 @@
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+On charge les données et les packages :
+
+```{r, include=F, eval=T}
 rm(list=ls())
 
 # chargement des données 
 donnees_mean <- readRDS("data_post_etape_4_Mean.Rdata", "rb")
 donnees_mean2 <- donnees_mean[,-1]
 
+library(VGAM)
+library(MASS)
+library(car)
+library(caret)
+library(ggplot2)
+library(reshape2)
 ```
+
+On fait en sorte que la modalité de référence soit "Sain".
 
 ```{r}
 donnees_mean2$y <- relevel(donnees_mean2$y, ref = "ENG_malade")
 
+levels(donnees_mean2$y)
+```
+
+Dans la suite des modélisations, nous aurons donc "mu[,1]" => "ENG_malade", "mu[,2]" => "PS_malade" et "mu[,3]" => "Sain".
+
+On effectue une régression logistique multinomiale sur Y avec les 21 variables explicatives.
+
+```{r}
+# Modélisation avec les 21 variables
 multinomial_logistic_model <- vglm(y ~ . ,data = donnees_mean2, family = multinomial)
 
+# Résumé du modèle
+logLik(multinomial_logistic_model)
+anova(multinomial_logistic_model)
+AIC(multinomial_logistic_model)
+BIC(multinomial_logistic_model)
+```
 
-library(MASS)
-library(car)
-library(caret)
+A la vue de la significativité de certaines variables, nous sommes tentés de les enlever de la modélisation et d'observer si cette réduction améliore significativement le modèle.
+(Les algorithmes connus permettant d'établir le meilleur modèle automatiquement ne fonctionnent qu'avec les fonctions lm ou glm mais pas vglm, pareil pour la fonction VIF alors nous cherchons à la main)
 
-# Suppression des variables non significatives (si nécessaire)
+```{r}
+# Modélisation avec 12 variables
 modele_reduit <- vglm(y ~ X09x3_FAB_CROISS_reg_rec +
                         X22x1_LOC_INF_rec +
                         X06x1_gene_majo_1_rec +
@@ -37,6 +62,37 @@ modele_reduit <- vglm(y ~ X09x3_FAB_CROISS_reg_rec +
                         A03_TxPosSero22sTgReel, 
                       family = multinomial, data = donnees_mean2)
 
+# Résumé du modèle
+logLik(modele_reduit)
+anova(modele_reduit)
+AIC(modele_reduit)
+BIC(modele_reduit)
+
+# Calcul des log-vraisemblance
+logLik_complet <- logLik(multinomial_logistic_model)
+logLik_reduit <- logLik(modele_reduit)
+
+# Écart de déviance
+X_stat <- -2 * (logLik_reduit - logLik_complet)
+
+# Degrés de liberté de la loi du khi-deux associée
+df <- 21 - 12
+
+# Calcul de la p_value
+p_value <- pchisq(X_stat, df, lower.tail = FALSE)
+
+# Affichage des résultats
+cat("Statistique du test X² :", X_stat, "\n")
+cat("Degrés de liberté :", df, "\n")
+cat("P-value associée :", p_value, "\n")
+```
+
+Selon le critère de l'AIC, du BIC, de la log-vraisemblance (significativement à 10^-5) ce modèle réduit est meilleur que le modèle complet
+
+De la même façon, pour autant, nous sommes tentés de retirer les 2 variables moins significatives et nous aimerions savoir si cette réduction est pertinente.
+
+```{r}
+# Modélisation avec 10 variables
 modele_reduit2 <- vglm(y ~ X09x3_FAB_CROISS_reg_rec +
                         X06x1_gene_majo_1_rec +
                         X12x2_MAT_PC +
@@ -49,6 +105,36 @@ modele_reduit2 <- vglm(y ~ X09x3_FAB_CROISS_reg_rec +
                         A03_TxPosSero22sTgReel, 
                       family = multinomial, data = donnees_mean2)
 
+# Résumé du modèle
+logLik(modele_reduit2)
+anova(modele_reduit2)
+AIC(modele_reduit2)
+BIC(modele_reduit2)
+
+# Calcul des log-vraisemblance
+logLik_reduit2 <- logLik(modele_reduit2)
+
+# Écart de déviance
+X_stat2 <- -2 * (logLik_reduit2 - logLik_reduit)
+
+# Degrés de liberté de la loi du khi-deux associée
+df2 <- 12 - 10
+
+# Calcul de la p_value
+p_value2 <- pchisq(X_stat2, df2, lower.tail = FALSE)
+
+# Affichage des résultats
+cat("Statistique du test X² :", X_stat2, "\n")
+cat("Degrés de liberté :", df2, "\n")
+cat("P-value associée :", p_value2, "\n")
+```
+
+Selon le critère de l'AIC, du BIC, de la log-vraisemblance (significativement à 0.03) ce modèle réduit est meilleur que le modèle complet
+
+Nous remarquons que la variable "A03_TxPosSero22sTgReel" devient plus significative, elle l'était peu dans le "modele_reduit", regardons ce que cela donne lorsqu'on la supprime du modèle :
+
+```{r}
+# Modélisation avec 9 variables
 modele_reduit3 <- vglm(y ~ X09x3_FAB_CROISS_reg_rec +
                         X06x1_gene_majo_1_rec +
                         X12x2_MAT_PC +
@@ -60,133 +146,90 @@ modele_reduit3 <- vglm(y ~ X09x3_FAB_CROISS_reg_rec +
                         A03_PosSeroMyAs, 
                       family = multinomial, data = donnees_mean2)
 
-summary(multinomial_logistic_model)
-summary(modele_reduit)
-summary(modele_reduit2)
-summary(modele_reduit3)
-
-logLik(multinomial_logistic_model)
-logLik(modele_reduit)
-logLik(modele_reduit2)
+# Résumé du modèle
 logLik(modele_reduit3)
-
-anova(multinomial_logistic_model)
-anova(modele_reduit)
-anova(modele_reduit2)
 anova(modele_reduit3)
-
-AIC(multinomial_logistic_model)
-AIC(modele_reduit)
-AIC(modele_reduit2)
 AIC(modele_reduit3)
-
-BIC(multinomial_logistic_model)
-BIC(modele_reduit)
-BIC(modele_reduit2)
 BIC(modele_reduit3)
 
 
-
-# Ainsi, est-ce que c'est significatif ?
-
-
-
-# Calcul de la statistique du test (écart de log-vraisemblance)
-logLik_complet <- logLik(multinomial_logistic_model)
-logLik_reduit <- logLik(modele_reduit)
-logLik_reduit2 <- logLik(modele_reduit2)
+# Calcul des log-vraisemblance
 logLik_reduit3 <- logLik(modele_reduit3)
-X_stat <- -2 * (logLik_reduit - logLik_complet)  # Écart de log-vraisemblance
-X_stat2 <- -2 * (logLik_reduit2 - logLik_reduit)  # Écart de log-vraisemblance
-X_stat3 <- -2 * (logLik_reduit3 - logLik_reduit2)  # Écart de log-vraisemblance
 
-# Degrés de liberté (différence du nombre de paramètres entre les modèles)
-df <- 21 - 12
-df2 <- 12 - 10
+# Écart de déviance
+X_stat3 <- -2 * (logLik_reduit3 - logLik_reduit2)
+
+# Degrés de liberté de la loi du khi-deux associée
 df3 <- 1
 
 # Calcul de la p-value
-p_value <- pchisq(X_stat, df, lower.tail = FALSE)
-p_value2 <- pchisq(X_stat2, df2, lower.tail = FALSE)
 p_value3 <- pchisq(X_stat3, df3, lower.tail = FALSE)
 
 # Affichage des résultats
-cat("Statistique du test X² :", X_stat, X_stat2, X_stat3, "\n")
-cat("Degrés de liberté :", df, df2, df3, "\n")
-cat("P-value associée :", p_value, p_value2, p_value3, "\n")
-
-
-levels(donnees_mean2$y)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+cat("Statistique du test X² :", X_stat3, "\n")
+cat("Degrés de liberté :", df3, "\n")
+cat("P-value associée :", p_value3, "\n")
 ```
 
+Selon le critère de l'AIC, il ne semble pas pertinent de retirer "A03_TxPosSero22sTgReel" (On sait que l'AIC a tendance à vouloir conserver plus de variables que les autres critères). Mais selon le critère du BIC, de la log-vraisemblance (significativement à 0.015) ce modèle réduit est meilleur que le modèle précédent. Nous conservons alors ce modèle à 9 variables.
 
-
+Création de la matrice de confusion :
 
 ```{r}
-# Charger la librairie dplyr si ce n'est pas déjà fait
-library(dplyr)
+# On obtient les prédictions du modèle (sur les mêmes valeurs qui l'ont entrainé, notre objectif final n'est pas de faire de la prédiction mais de la modélisation)
+predictions <- predict(modele_reduit3, newdata = donnees_mean2, type = "response")
+classes_pred <- apply(predictions, 1, which.max)
+classes_pred <- factor(classes_pred, levels = c(1, 2, 3), labels = c("ENG_malade", "PS_malade", "Sain"))
 
-# Supprimer les variables spécifiques de la base de données
-donnees_mean <- donnees_mean %>%
-  select(-"X07x1_AN_CONST4_mean_3", 
-         -"T16_BS_TenueSpeciElev", 
-         -"LR_LRF", 
-         -"T10_PS_AlimPoNourrLongpPo")
-
-# Vérifier les nouvelles colonnes de la base de données
-colnames(donnees_mean)
-
-set.seed(36)
-train_index <- createDataPartition(donnees_mean$y, p = 0.8, list = FALSE)
-train_data <- donnees_mean[train_index, ]
-test_data <- donnees_mean[-train_index, ]
-
-library("VGAM")
-multinomial_logistic_model <- vglm(y ~ . ,data = train_data, family = multinomial)
+# On crée la matrice de confusion
+confusion.matrix <- table(True = donnees_mean2$y, Predicted = classes_pred)
+confusion.matrix
+confusion.matrix_norm <- prop.table(confusion.matrix, 1)*100
+round(confusion.matrix_norm,1)
 ```
+
+On cherche maintenant à avoir une meilleure visualisation de cette matrice de confusion.
 
 ```{r}
-model_summary <- summary(modele_reduit3)
-coefficients <- coefficients(model_summary)
+# Visualiser la matrice de confusion normalisée
+confusion_df <- melt(confusion.matrix_norm)
+colnames(confusion_df) <- c("True", "Predicted", "Value")
 
-# Utiliser la méthode 'z' pour obtenir les valeurs des statistiques de Wald
-wald_statistics <- coefficients[, "z value"]
-
-# Utiliser la méthode 'Pr(>|z|)' pour obtenir les p-values
-p_values <- coefficients[, "Pr(>|z|)"]
-
-# Vérifier les p-values
-print(p_values)
-
-# Identifier les variables avec des p-values significatives (par exemple p < 0.05)
-significant_vars <- names(p_values)[p_values < 0.05]
-
-# Créer une formule avec les variables significatives
-formula <- as.formula(paste("y ~", paste(significant_vars, collapse = " + ")))
-formula
-# Créer un nouveau modèle avec les variables significatives
-significant_model <- vglm(y ~ X09x3_FAB_CROISS_reg_rec + 
-    X12x2_MAT_PC + T10_PS_EauDebi_3 + 
-    X07x1_AN_CONST4_mean_3 + LR_LRF + T13_ENG_milieuDegrad.x + 
-    A03_Pos10sVERS + A03_PosSeroMyAs, data = donnees_mean2, family = multinomial())
-
-# Afficher le résumé du nouveau modèle
-summary(significant_model)
-anova(significant_model)
+ggplot(data = confusion_df, aes(x = True, y = Predicted, fill = Value)) +
+  geom_tile() +
+  geom_text(aes(label = sprintf("%.2f", Value)), color = "white") +
+  scale_fill_gradient(low = "white", high = "red") +
+  theme_minimal() +
+  labs(title = "Matrice de Confusion Normalisée", x = "Classe Réelle", y = "Classe Prédite")
 ```
 
+Désormais, on cherche à observer la précision et la sensibilité du modèle :
 
+```{r}
+true_classes <- donnees_mean2$y
+
+# Utiliser la fonction confusionMatrix du package 'caret'
+conf_matrix <- confusionMatrix(factor(classes_pred, levels = c("ENG_malade", "PS_malade", "Sain") ), factor(true_classes))
+
+# Récupérer les précisions et rappels par classe
+precision <- conf_matrix$byClass[,"Pos Pred Value"]
+recall <- conf_matrix$byClass[,"Sensitivity"]
+
+# Créer un dataframe pour la visualisation
+metrics_df <- data.frame(
+  Classe = c("ENG_malade", "PS_malade", "Sain"),
+  Precision = precision,
+  sensitivity = recall
+)
+
+metrics_df
+```
+
+La précision mesure la proportion des prédictions positives qui sont correctes.
+La sensibilité mesure la capacité du modèle à détecter les vrais positifs.
+
+Nous pouvons donc dire que le modèle est satisfaisant (environ 70% de bonne modélisation). Le point visiblement négatif est que pour 26% des élevages que nous avons classé en "ENG_malade", le modèle les prédit en "PS_malade".
+
+On rappelle que les classes "ENG_malade" et "PS_malade" n'indiquent pas un élevage 100% malade mais indiquent uniquement une tendance des porcs à tousser et/ou à éternuer plus que la moyenne des élevages.
+
+Reste à faire l'interprétation des résultats de la régression logistique multinomiale (de combien est-ce qu'une variable augmente la probabilité à être malade, etc...)
