@@ -171,7 +171,7 @@ cat("Degrés de liberté :", df3, "\n")
 cat("P-value associée :", p_value3, "\n")
 ```
 
-Selon le critère de l'AIC, il ne semble pas pertinent de retirer "A03_TxPosSero22sTgReel" (On sait que l'AIC a tendance à vouloir conserver plus de variables que les autres critères). Mais selon le critère du BIC, de la log-vraisemblance (significativement à 0.015) ce modèle réduit est meilleur que le modèle précédent. Nous conservons alors ce modèle à 9 variables.
+Selon le critère de l'AIC, il ne semble pas pertinent de retirer "A03_TxPosSero22sTgReel" (On sait que l'AIC a tendance à vouloir conserver plus de variables que les autres critères). Mais selon le critère du BIC, de la log-vraisemblance (significativement à 0.015) ce modèle réduit est meilleur que le modèle précédent. Nous conservons alors ce modèle à 9 variables (les 9 variables ont une p-value inférieure à 0.015 !).
 
 Création de la matrice de confusion :
 

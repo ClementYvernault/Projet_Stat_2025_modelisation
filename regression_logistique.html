@@ -614,7 +614,8 @@ cat(&quot;Statistique du test X² :&quot;, X_stat3, &quot;\n&quot;)</code></pre>
 conserver plus de variables que les autres critères). Mais selon le
 critère du BIC, de la log-vraisemblance (significativement à 0.015) ce
 modèle réduit est meilleur que le modèle précédent. Nous conservons
-alors ce modèle à 9 variables.</p>
+alors ce modèle à 9 variables (les 9 variables ont une p-value
+inférieure à 0.015 !).</p>
 <p>Création de la matrice de confusion :</p>
 <pre class="r"><code># On obtient les prédictions du modèle (sur les mêmes valeurs qui l&#39;ont entrainé, notre objectif final n&#39;est pas de faire de la prédiction mais de la modélisation)
 predictions &lt;- predict(modele_reduit3, newdata = donnees_mean2, type = &quot;response&quot;)
