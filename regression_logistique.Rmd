@@ -233,3 +233,9 @@ Nous pouvons donc dire que le modèle est satisfaisant (environ 70% de bonne mod
 On rappelle que les classes "ENG_malade" et "PS_malade" n'indiquent pas un élevage 100% malade mais indiquent uniquement une tendance des porcs à tousser et/ou à éternuer plus que la moyenne des élevages.
 
 Reste à faire l'interprétation des résultats de la régression logistique multinomiale (de combien est-ce qu'une variable augmente la probabilité à être malade, etc...)
+
+```{r}
+summary(modele_reduit3)
+summary(donnees_mean2$y)
+
+```
