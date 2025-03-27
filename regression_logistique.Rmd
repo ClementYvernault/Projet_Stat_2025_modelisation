@@ -3,6 +3,16 @@
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+TODO :
+
+```{r}
+# Retirer les variables 1 à 1 et vérifier que les coefficients ne changent pas.
+# Calculer le pseudo R²
+# Courbe ROC et AUC
+# Savoir quels tests sont réalisés pour obtenir les "95%"
+# Validation croisée
+```
+
 On charge les données et les packages :
 
 ```{r, include=F, eval=T}
