@@ -11,6 +11,8 @@ TODO :
 # Courbe ROC et AUC
 # Savoir quels tests sont réalisés pour obtenir les "95%"
 # Validation croisée
+# Enlever "risque" dans l'interprétation
+# Regarder le lien entre MilieuDegrad.x et T_EXT pour déterminer si le milieu est dégradé à cause de la période de la visite.
 ```
 
 On charge les données et les packages :
