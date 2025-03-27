@@ -13,6 +13,7 @@ TODO :
 # Validation croisée
 # Enlever "risque" dans l'interprétation
 # Regarder le lien entre MilieuDegrad.x et T_EXT pour déterminer si le milieu est dégradé à cause de la période de la visite.
+# Regarder sans gene majo
 ```
 
 On charge les données et les packages :
@@ -53,6 +54,114 @@ logLik(multinomial_logistic_model)
 anova(multinomial_logistic_model)
 AIC(multinomial_logistic_model)
 BIC(multinomial_logistic_model)
+```
+On supprime itérativement les variables avec la plus forte p-value et on regarde si les autres coefficients sont modifiés :
+
+```{r}
+multinomial_logistic_model2 <- vglm(y ~ . - X13x2_QUAI_t, 
+                                  data = donnees_mean2, 
+                                  family = multinomial)
+
+summary(multinomial_logistic_model)
+summary(multinomial_logistic_model2)
+anova(multinomial_logistic_model2)
+
+
+
+multinomial_logistic_model3 <- vglm(
+  y ~ . - X13x2_QUAI_t - T10_PS_AlimPoNourrLongpPo,
+  data = donnees_mean2,
+  family = multinomial
+)
+
+summary(multinomial_logistic_model2)
+summary(multinomial_logistic_model3)
+anova(multinomial_logistic_model3)
+
+
+
+multinomial_logistic_model4 <- vglm(
+  y ~ . - X13x2_QUAI_t - T10_PS_AlimPoNourrLongpPo - T16_BS_TenueSpeciElev,
+  data = donnees_mean2,
+  family = multinomial
+)
+
+summary(multinomial_logistic_model3)
+summary(multinomial_logistic_model4)
+anova(multinomial_logistic_model4)
+
+
+
+multinomial_logistic_model5 <- vglm(
+  y ~ . - X13x2_QUAI_t - T10_PS_AlimPoNourrLongpPo - T16_BS_TenueSpeciElev - X25x1_ElvAlterChoiPers,
+  data = donnees_mean2,
+  family = multinomial
+)
+
+summary(multinomial_logistic_model4)
+summary(multinomial_logistic_model5)
+anova(multinomial_logistic_model5)
+
+
+
+multinomial_logistic_model6 <- vglm(
+  y ~ . - X13x2_QUAI_t - T10_PS_AlimPoNourrLongpPo - T16_BS_TenueSpeciElev - X25x1_ElvAlterChoiPers - ENG_TROU,
+  data = donnees_mean2,
+  family = multinomial
+)
+
+summary(multinomial_logistic_model5)
+summary(multinomial_logistic_model6)
+anova(multinomial_logistic_model6)
+
+# Pour l'instant, les coefficients n'ont pas évolué de plus de 10% et on n'a supprimé que des variables avec p-value > à 0.4
+
+
+# Charger les bibliothèques nécessaires
+library(dplyr)
+
+# Extraire les coefficients et erreurs standards du modèle
+coeffs <- c(-4.84332, 2.49321, 1.10426, -1.17940, 1.04740, -0.92783, 4.40365, 
+            3.75603, 5.40594, -3.92282, 0.58251, -3.24695, -1.12856, 3.20187, 
+            -3.87949, -2.47090, -6.11601, -4.19455, 2.88056, 1.59579, 
+            -2.46645, -4.34882, 2.64886, 2.01841, 2.23786, 3.64219)
+
+se <- c(2.66266, 1.07575, 1.29322, 1.03747, 1.10362, 1.26796, 2.02027, 
+        1.41271, 1.85226, 1.44300, 1.39442, 1.53478, 1.69009, 1.81116, 
+        1.52666, 1.47737, 2.57530, 1.47299, 1.43079, 1.51159, 
+        1.62025, 1.82223, 1.24964, 1.23436, 1.09510, 1.44831)
+
+variables <- c("(Intercept):2", "X09x3_FAB_CROISS_reg_rec1:1", 
+               "X09x3_FAB_CROISS_reg_rec1:2", "X22x1_LOC_INF_rec1:1", 
+               "X22x1_LOC_INF_rec1:2", "X06x1_gene_majo_1_rec1:1", 
+               "X06x1_gene_majo_1_rec1:2", "X12x2_MAT_PC2:1", 
+               "X12x2_MAT_PC2:2", "T10_PS_EauDebi_31:1", "T10_PS_EauDebi_31:2", 
+               "T10_PS_EauDebi_32:1", "T10_PS_EauDebi_32:2", 
+               "X07x1_AN_CONST4_mean_31:2", "X07x1_AN_CONST4_mean_32:1", 
+               "X07x1_AN_CONST4_mean_32:2", "LR_LRF1:2", 
+               "T13_ENG_milieuDegrad.x1:2", "X18x2_ABBTX_PS1:1", 
+               "X18x2_ABBTX_PS1:2", "X19x2_ABB_E1:1", "X19x2_ABB_E1:2", 
+               "A03_Pos10sVERS1:1", "A03_Pos10sVERS1:2", 
+               "A03_PosSeroMyAsOui:1", "A03_PosSeroMyAsOui:2")
+
+# Calcul des OR et des IC à 95%
+or_values <- exp(coeffs)
+lower_ci <- exp(coeffs - 1.96 * se)  # Borne inférieure de l'IC 95%
+upper_ci <- exp(coeffs + 1.96 * se)  # Borne supérieure de l'IC 95%
+
+# Vérifier si 1 est dans l'intervalle de confiance
+significatif <- ifelse(lower_ci <= 1 & upper_ci >= 1, "NON", "OUI")
+
+# Créer un data frame pour afficher les résultats
+table_or <- data.frame(
+  Variable = variables,
+  OR = round(or_values, 2),
+  IC_95 = paste0("[", round(lower_ci, 2), "; ", round(upper_ci, 2), "]"),
+  Significatif = significatif  # Ajout de la colonne de signification
+)
+
+# Affichage du tableau
+print(table_or)
 ```
 
 A la vue de la significativité de certaines variables, nous sommes tentés de les enlever de la modélisation et d'observer si cette réduction améliore significativement le modèle.
