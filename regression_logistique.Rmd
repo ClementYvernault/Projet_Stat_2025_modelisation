@@ -116,6 +116,7 @@ anova(multinomial_logistic_model6)
 
 # Pour l'instant, les coefficients n'ont pas évolué de plus de 10% et on n'a supprimé que des variables avec p-value > à 0.4
 
+# On veut savoir pour quelles variables est-ce qu'on ne peut pas
 
 # Charger les bibliothèques nécessaires
 library(dplyr)
