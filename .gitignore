@@ -3,3 +3,9 @@
 .RData
 .Ruserdata
 Xavier
+*.html
+*.png
+*.pdf
+*.xlsx
+*.docx
+

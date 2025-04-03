@@ -137,12 +137,33 @@ NB : les variables X sont centrées et réduites à ce niveau
 
 Choix du nombre de dimensions a interpréter (minimiser l'erreur de prédiction 2-fold et d'explication)
 ```{r, echo = T, warning = F, message = F}
-par(mfrow = c(1, 3))
+rmsec_values <- res.2foldcv2$statsRMSEc$Mean
+rmsec_values[is.nan(rmsec_values)] <- NA
 somme <- res.2foldcv2$statsRMSEv$Mean + res.2foldcv2$statsRMSEc$Mean
-plot(res.2foldcv2$statsRMSEc$Mean)
-plot(res.2foldcv2$statsRMSEv$Mean)
-plot(somme)
-match(min(na.omit(somme)), somme)
+
+par(mfrow = c(1, 3))
+png("selection_nombre_dim_y3_it1.png", height=250, width=775)
+par(mfrow = c(1, 3))
+rmsec_values <- res.2foldcv2$statsRMSEc$Mean
+rmsec_values[is.nan(rmsec_values)] <- NA
+# Tracer la courbe d'erreur de validation (rouge)
+plot(1:length(res.2foldcv2$statsRMSEv$Mean), res.2foldcv2$statsRMSEv$Mean, type = "b", pch = 16, col = "black",
+     xlab = "Nombre de dimensions", ylab = "Erreur",
+     main = "Erreur Validation",
+     cex.main=1.75,
+     cex.axis=1.7, cex.lab=1.5)
+
+# Ajouter la courbe d'erreur d'apprentissage (bleue)
+plot(1:length(rmsec_values), rmsec_values, type = "b", pch = 16, col = "black",
+     xlab = "Nombre de dimensions", ylab = "Erreur",
+     main = "Erreur Apprentissage",cex.main=1.75,
+     cex.axis=1.7, cex.lab=1.5)
+
+plot(1:length(somme), somme, type = "b", pch = 16, col = "black",
+     xlab = "Nombre de dimensions", ylab = "Erreur",
+     main = "Somme des erreurs", cex.main=1.75,
+     cex.axis=1.7, cex.lab=1.5)
+dev.off()
 ```
 
 4 dimensions
@@ -277,11 +298,33 @@ res.2foldcv2 <- testdim(res.mbpls2, nrepet = 500)  # calcul long
 ## Choix des dimensions
 
 ```{r, echo = T, warning = F, message = F}
-par(mfrow = c(1, 3))
+rmsec_values <- res.2foldcv2$statsRMSEc$Mean
+rmsec_values[is.nan(rmsec_values)] <- NA
 somme <- res.2foldcv2$statsRMSEv$Mean + res.2foldcv2$statsRMSEc$Mean
-plot(res.2foldcv2$statsRMSEc$Mean)
-plot(res.2foldcv2$statsRMSEv$Mean)
-plot(somme)
+
+par(mfrow = c(1, 3))
+png("selection_nombre_dim_y3_it2.png", height=250, width=775)
+par(mfrow = c(1, 3))
+rmsec_values <- res.2foldcv2$statsRMSEc$Mean
+rmsec_values[is.nan(rmsec_values)] <- NA
+# Tracer la courbe d'erreur de validation (rouge)
+plot(1:length(res.2foldcv2$statsRMSEv$Mean), res.2foldcv2$statsRMSEv$Mean, type = "b", pch = 16, col = "black",
+     xlab = "Nombre de dimensions", ylab = "Erreur",
+     main = "Erreur Validation",
+     cex.main=1.75,
+     cex.axis=1.7, cex.lab=1.5)
+
+# Ajouter la courbe d'erreur d'apprentissage (bleue)
+plot(1:length(rmsec_values), rmsec_values, type = "b", pch = 16, col = "black",
+     xlab = "Nombre de dimensions", ylab = "Erreur",
+     main = "Erreur Apprentissage",cex.main=1.75,
+     cex.axis=1.7, cex.lab=1.5)
+
+plot(1:length(somme), somme, type = "b", pch = 16, col = "black",
+     xlab = "Nombre de dimensions", ylab = "Erreur",
+     main = "Somme des erreurs", cex.main=1.75,
+     cex.axis=1.7, cex.lab=1.5)
+dev.off()
 match(min(na.omit(somme)), somme)
 ```
 On prend 4 dimensions encore une fois.
@@ -316,7 +359,7 @@ res.plot[[4]]   # Variable Y
 ```
 
 * axe 1 : discrimine selon eng_malade ou pas
-*axe 2 : sain ou ps_malade (sain positif, ps_malade negatif) 
+* axe 2 : sain ou ps_malade (sain positif, ps_malade negatif) 
 ```{r}
 res.plot[[5]]   # Variables Xk
 ```
@@ -387,11 +430,32 @@ res.2foldcv2 <- testdim(res.mbpls2, nrepet = 500)  # calcul long
 ## Choix des dimensions
 
 ```{r, echo = T, warning = F, message = F}
-par(mfrow = c(1, 3))
+rmsec_values <- res.2foldcv2$statsRMSEc$Mean
+rmsec_values[is.nan(rmsec_values)] <- NA
 somme <- res.2foldcv2$statsRMSEv$Mean + res.2foldcv2$statsRMSEc$Mean
-plot(res.2foldcv2$statsRMSEc$Mean)
-plot(res.2foldcv2$statsRMSEv$Mean)
-plot(somme)
+
+png("selection_nombre_dim_y3_it3.png", height=250, width=775)
+par(mfrow = c(1, 3))
+rmsec_values <- res.2foldcv2$statsRMSEc$Mean
+rmsec_values[is.nan(rmsec_values)] <- NA
+# Tracer la courbe d'erreur de validation (rouge)
+plot(1:length(res.2foldcv2$statsRMSEv$Mean), res.2foldcv2$statsRMSEv$Mean, type = "b", pch = 16, col = "black",
+     xlab = "Nombre de dimensions", ylab = "Erreur",
+     main = "Erreur Validation",
+     cex.main=1.75,
+     cex.axis=1.7, cex.lab=1.5)
+
+# Ajouter la courbe d'erreur d'apprentissage (bleue)
+plot(1:length(rmsec_values), rmsec_values, type = "b", pch = 16, col = "black",
+     xlab = "Nombre de dimensions", ylab = "Erreur",
+     main = "Erreur Apprentissage",cex.main=1.75,
+     cex.axis=1.7, cex.lab=1.5)
+
+plot(1:length(somme), somme, type = "b", pch = 16, col = "black",
+     xlab = "Nombre de dimensions", ylab = "Erreur",
+     main = "Somme des erreurs", cex.main=1.75,
+     cex.axis=1.7, cex.lab=1.5)
+dev.off()
 match(min(na.omit(somme)), somme)
 ```
 
@@ -456,7 +520,9 @@ res.plot[[3]]   # Blocs Xk
 ```
 Cette fois ci, tous les blocs contribuent autant dans la création des deux axes
 ```{R}
+png("import_bloc_expl.png", width=600, height=300)
 plot(res.boot$bipc)                  # Importance des blocs explicatifs (seuil 1/K, K = nb blocs)
+dev.off()
 ```
 
 5 blocs X donc 1/k=20%; 0.2
@@ -485,9 +551,17 @@ Négatif axe 2:
 
 ```{r}
 plot(res.boot$vipc)                  # Importance des variables explicatives (pour tout le bloc Y ; seuil 1/P)
-plot(res.boot$XYcoef[[1]])           # Importance des variables explicatives (pour la variable y1 ; seuil 0)
-plot(res.boot$XYcoef[[2]])           # Importance des variables explicatives (pour la variable y2 ; seuil 0)
-plot(res.boot$XYcoef[[3]])           # Importance des variables explicatives (pour la variable y3 ; seuil 0)
+names(res.boot$XYcoef)
+png("import_var_y_sain.png", width=600, height=300)
+plot(res.boot$XYcoef$sain)           # Importance des variables explicatives (pour la variable y1 ; seuil 0)
+dev.off()
+png("import_var_y_ps_malade.png", width=600, height=300)
+plot(res.boot$XYcoef$ps_malade)           # Importance des variables explicatives (pour la variable y2 ; seuil 0)
+dev.off()
+png("import_var_y_eng_malade.png", width=600, height=300)
+plot(res.boot$XYcoef$eng_malade)           # Importance des variables explicatives (pour la variable y3 ; seuil 0)
+dev.off()
+
 ```  
 
 ### Suppr Variables Variables Non Significatives
@@ -498,24 +572,21 @@ names(toujours_0)[toujours_0]
 ```
 
 On s'arrête ici.
-## Doit-on refaire analyses de classification avec nouveau modèle de la mb-pls
+
 # Matrice de confusion pour le modèle final
 
 ```{r}
-coef_obs1 <- res.mbpls2$XYcoef[[1]][,1:4]
-coef_obs2 <- res.mbpls2$XYcoef[[2]][,1:4]
-coef_obs3 <- res.mbpls2$XYcoef[[3]][,1:4]
+coef_obs1 <- res.mbpls2$XYcoef[[1]][,4]
+coef_obs2 <- res.mbpls2$XYcoef[[2]][,4]
+coef_obs3 <- res.mbpls2$XYcoef[[3]][,4]
 beta <- cbind(coef_obs1, coef_obs2, coef_obs3)
 dim(beta)
 dim(as.matrix(res.mbpls2$tabX)) # 100 * 18, obs, nombre variables
-Y.pred   <- as.matrix(res.mbpls2$tabX) %*% as.matrix(beta)
+
+Y.pred <- as.matrix(res.mbpls2$tabX) %*% as.matrix(beta)
 
 rownames(Y.pred) <- rownames(data.clean)
-
-
-class.pred <- apply(Y.pred, 1, function(x) {((which.max(x) - 1) %/% 4) + 1}) 
-# on pourra essayer de faire la moyenne par axe (pondérée par explicaion de Y par exemple et appliquer ensuite la fonction en ayant ainsi que trois colonnes, à demander)
-# Intérêt de comparer es matrices de confusion des 3 diff modeles utilisées ici ?
+class.pred <- apply(Y.pred, 1, which.max)
 
 class.names <- c("Sain", "PS_malade", "ENG_malade")
 
@@ -584,11 +655,12 @@ true_binary2 <- ifelse(true.classes == "PS_malade", "PS_malade", "other")
 true_binary3 <- ifelse(true.classes == "ENG_malade", "ENG_malade", "other")
 
 # Créer les objets de prédiction pour chaque classe
-roc1 <- roc(true_binary1, as.numeric(class.pred == "Sain"), plot = TRUE, col = "red", main = "Courbes ROC Multiclasse")
+png("courbe_roc.png", height=550, width=550)
+roc1 <- roc(true_binary1, as.numeric(class.pred == "Sain"), plot = TRUE, col = "red", main = "")
 roc2 <- roc(true_binary2, as.numeric(class.pred == "PS_malade"), plot = TRUE, col = "green", add = TRUE)
 roc3 <- roc(true_binary3, as.numeric(class.pred == "ENG_malade"), plot = TRUE, col = "blue", add = TRUE)
-legend("bottomright", legend = c("Classe 1", "Classe 2", "Classe 3"), col = c("red", "green", "blue"), lwd = 2)
-
+legend("bottomright", legend = c("San", "PS_malade", "ENG_malade"), col = c("red", "green", "blue"), lwd = 2)
+dev.off()
 ```
 # Précision et Sensibilité
 ```{r}
@@ -611,26 +683,27 @@ metrics_df <- data.frame(
 metrics_df
 
 # Visualiser la précision et le rappel par classe
+library(ggplot2)
+library(RColorBrewer)
+colors = brewer.pal(n = 6, name = "Set3")
+colors
+library(ggpattern, help, pos = 2, lib.loc = NULL)
 ggplot(metrics_df, aes(x = Classe)) +
-  geom_bar(aes(y = Precision, fill = "Precision"), stat = "identity", position = "dodge") +
-  geom_bar(aes(y = sensitivity, fill = "sensitivity"), stat = "identity", position = "dodge") +
-  scale_fill_manual(name = "Metric", values = c("Precision" = "darkred", "sensitivity" = "lightgreen")) +
+  geom_bar(aes(y = Precision, fill = "Precision"), 
+           stat = "identity", 
+           position = "dodge") +
+  geom_bar(aes(y = sensitivity, fill = "sensitivity"), 
+           stat = "identity", 
+           position = "dodge") +
+  scale_fill_manual(
+    name = "Metric",
+    values = c(
+      "Precision" = alpha(colors[1], 0.85), 
+      "sensitivity" = alpha(colors[6], 0.55)  # Apply 50% transparency to green
+      
+    )
+  ) +
   theme_minimal() +
   labs(title = "Précision et Sensibilité par Classe", y = "Valeur")
 ```
-La précision est la proportion des prédictions positives correctes parmi toutes les prédictions positives faites par le modèle.
-
-La sensibiité est la proportion des prédictions positives correctes parmi toutes les instances positives réelles.
-
-Exemple : 
-Classe 1 
-*Précision* : 0.7037037
-
-Cela signifie que 70.37% des instances prédictes comme étant de la classe 1 sont effectivement de la classe 1. En d’autres termes, parmi toutes les prédictions pour la classe 1, environ 70% sont correctes et 30% sont incorrectes (faux positifs). 
-
-*Sensibilité (Rappel)* : 0.8260870
-
-Cela signifie que 82.61% des instances réellement de la classe 1 sont correctement identifiées par le modèle. En d’autres termes, le modèle a bien capturé environ 83% des instances de la classe 1, mais en a manqué environ 17% (faux négatifs).
-
-
 
