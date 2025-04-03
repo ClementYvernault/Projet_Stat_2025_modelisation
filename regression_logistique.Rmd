@@ -1,215 +1,363 @@
-#vide 
-rm(list=ls())
 
-# installation des packages
-install.packages("VGAM")
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+TODO :
+
 ```{r}
+# Retirer les variables 1 à 1 et vérifier que les coefficients ne changent pas.
+# Calculer le pseudo R²
+# Courbe ROC et AUC
+# Savoir quels tests sont réalisés pour obtenir les "95%"
+# Validation croisée
+# Enlever "risque" dans l'interprétation
+# Regarder le lien entre MilieuDegrad.x et T_EXT pour déterminer si le milieu est dégradé à cause de la période de la visite.
+# Regarder sans gene majo
+```
+
+On charge les données et les packages :
+
+```{r, include=F, eval=T}
 rm(list=ls())
 
 # chargement des données 
-donnees_forest <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Forest.Rdata", "rb")
-donnees_mean <- readRDS("Projet_Stat_2025_modelisation/data_post_etape_4_Mean.Rdata", "rb")
+donnees_mean <- readRDS("data_post_etape_4_Mean.Rdata", "rb")
+donnees_mean2 <- donnees_mean[,-1]
 
-```
-=======
-Blocs_Y_76X01_X07
->>>>>>> 793ef1d9fec51ef1276e9d9f0e638ab56804269f
-# on commence par travailler avec donnees_forest
-colnames(donnees_forest)
+library(VGAM)
+library(MASS)
+library(car)
 library(caret)
-set.seed(36)
-train_index <- createDataPartition(donnees_forest$y, p = 0.8, list = FALSE)
-
-# Diviser les données en train et test
-```{r}
-donnees_forest2 <- donnees_forest[,-1]
-train_data <- donnees_forest[train_index, ]
-train_data <- train_data[,-1]
-test_data <- donnees_forest[-train_index, ]
-```
-
-# Vérifier les proportions dans les deux ensembles
-prop.table(table(train_data$y))
-prop.table(table(test_data$y))
-
-
-On s'interesse aux problèmes de séparation parfaite.
-Il n'y a pas de problème pour les variables catégorielles car on a déjà vérfié les proportions.
-```{r}
-# Sélectionner uniquement les variables explicatives
-vars_explicatives <- names(donnees_forest)[!names(donnees_forest) %in% "y"]
-
-# Boucle pour vérifier la séparation parfaite
-for (var in vars_explicatives) {
-  tab <- table(donnees_forest$y, donnees_forest[[var]])
-  
-  # Vérifie si une modalité d'une variable prédit toujours une seule classe de y
-  if (any(rowSums(tab == 0) == (nrow(tab) - 1))) {
-    cat("⚠️ Problème de séparation parfaite détecté pour :", var, "\n")
-    print(tab)
-  }
-}
-```
-
-On regarde donc chaque variables numérique en effectuant une regression multinomiale.
-Pour A04_My10Mfloc, il y a un problème de fitted_prob pour:
-Individu 33 :
-ENG_malade: 0.1156
-PS_malade: 0.0245
-Sain: 0.8599
-
-Individu 98 :
-ENG_malade: 0.0378
-PS_malade: 0.0042
-Sain: 0.9581
-Il faut donc supprimer l'individu ou la variable. Una valeur trop élevé -> sain
-
-```{r}
-library(VGAM)  # Pour la régression multinomiale
-
-# Sélectionner uniquement les variables quantitatives
-vars_quanti <- names(donnees_forest)[sapply(donnees_forest, is.numeric)]
-
-for (var in vars_quanti) {
-  cat("\n🔹 Test de la variable :", var, "\n")
-  
-  # Modèle de régression multinomiale
-  formula <- as.formula(paste("y ~", var))
-  model <- vglm(formula, family = multinomial, data = donnees_forest)
-
-  # Extraire les coefficients
-  coef_val <- coef(model)
-  
-  # Vérifier si certains coefficients sont très grands (seuil arbitraire)
-  if (any(abs(coef_val) > 10)) {
-    cat("⚠️ Alerte : Problème de séparation possible ! Coefficients élevés pour", var, "\n")
-  }
-
-  # Vérifier les fitted probabilities
-  fitted_probs <- fitted(model)
-  if (any(fitted_probs < 0.01 | fitted_probs > 0.99)) {
-    cat("⚠️ Alerte : Problème de fitted probabilities proches de 0 ou 1 pour", var, "\n")
-    print(fitted_probs)
-  }
-}
-
-```
-
-On va recoder la variable en 3 modalités 
-```{r}
 library(ggplot2)
-
-# Afficher la distribution sous forme de table pour voir les valeurs distinctes
-table(donnees_forest$A04_My10Mfloc)
-
-# Affichage graphique
-ggplot(donnees_forest, aes(x = as.factor(A04_My10Mfloc))) +
-  geom_bar(fill = "steelblue", color = "black") +
-  theme_minimal() +
-  labs(title = "Distribution de A04_My10Mfloc (discrète)")
-
-# Trier les valeurs distinctes et leurs effectifs
-effectifs <- as.data.frame(table(donnees_forest$A04_My10Mfloc))
-colnames(effectifs) <- c("valeur", "effectif")
-effectifs$valeur <- as.numeric(as.character(effectifs$valeur))  # Conversion en numérique si besoin
-effectifs <- effectifs[order(effectifs$valeur), ]
-
-# Trouver un seuil pour avoir au moins 15% d'effectif dans la dernière modalité
-total_effectif <- sum(effectifs$effectif)
-effectifs$cumule <- cumsum(effectifs$effectif) / total_effectif  # Fréquence cumulée
-
-# Déterminer le seuil pour "élevé" (valeur où on dépasse 85% des observations)
-seuil_eleve <- min(effectifs$valeur[effectifs$cumule >= 0.85])
-
-# Définition des 3 groupes en fonction de cette coupure
-donnees_forest$A04_My10Mfloc <- cut(
-  donnees_forest$A04_My10Mfloc,
-  breaks = c(-Inf, 0, seuil_eleve, Inf),
-  labels = c("zero", "moyen", "élevé")
-)
-
-# Transformer en facteur
-donnees_forest$A04_My10Mfloc <- as.factor(donnees_forest$A04_My10Mfloc)
-
-# Vérification de la répartition des classes
-table(donnees_forest$A04_My10Mfloc)
-prop.table(table(donnees_forest$A04_My10Mfloc))
-
-# Affichage graphique après transformation
-ggplot(donnees_forest, aes(x = A04_My10Mfloc)) +
-  geom_bar(fill = "darkorange", color = "black") +
-  theme_minimal() +
-  labs(title = "Distribution de A04_My10Mfloc après transformation en factor : seuil = 43839")
-
+library(reshape2)
 ```
 
-```{r}
-set.seed(36)
-train_index <- createDataPartition(donnees_forest$y, p = 0.8, list = FALSE)
-train_data <- donnees_forest[train_index, ]
-test_data <- donnees_forest[-train_index, ]
+On fait en sorte que la modalité de référence soit "Sain".
 
-library("VGAM")
-multinomial_logistic_model <- vglm(y ~ . ,data = train_data, family = multinomial)
-```
-# analyse
 ```{r}
+donnees_mean2$y <- relevel(donnees_mean2$y, ref = "ENG_malade")
+
+levels(donnees_mean2$y)
+```
+
+Dans la suite des modélisations, nous aurons donc "mu[,1]" => "ENG_malade", "mu[,2]" => "PS_malade" et "mu[,3]" => "Sain".
+
+On effectue une régression logistique multinomiale sur Y avec les 21 variables explicatives.
+
+```{r}
+# Modélisation avec les 21 variables
+multinomial_logistic_model <- vglm(y ~ . ,data = donnees_mean2, family = multinomial)
+
+# Résumé du modèle
+logLik(multinomial_logistic_model)
+anova(multinomial_logistic_model)
+AIC(multinomial_logistic_model)
+BIC(multinomial_logistic_model)
+```
+On supprime itérativement les variables avec la plus forte p-value et on regarde si les autres coefficients sont modifiés :
+
+```{r}
+multinomial_logistic_model2 <- vglm(y ~ . - X13x2_QUAI_t, 
+                                  data = donnees_mean2, 
+                                  family = multinomial)
 
 summary(multinomial_logistic_model)
-```
-```{r}
-# Charger la librairie dplyr si ce n'est pas déjà fait
+summary(multinomial_logistic_model2)
+anova(multinomial_logistic_model2)
+
+
+
+multinomial_logistic_model3 <- vglm(
+  y ~ . - X13x2_QUAI_t - T10_PS_AlimPoNourrLongpPo,
+  data = donnees_mean2,
+  family = multinomial
+)
+
+summary(multinomial_logistic_model2)
+summary(multinomial_logistic_model3)
+anova(multinomial_logistic_model3)
+
+
+
+multinomial_logistic_model4 <- vglm(
+  y ~ . - X13x2_QUAI_t - T10_PS_AlimPoNourrLongpPo - T16_BS_TenueSpeciElev,
+  data = donnees_mean2,
+  family = multinomial
+)
+
+summary(multinomial_logistic_model3)
+summary(multinomial_logistic_model4)
+anova(multinomial_logistic_model4)
+
+
+
+multinomial_logistic_model5 <- vglm(
+  y ~ . - X13x2_QUAI_t - T10_PS_AlimPoNourrLongpPo - T16_BS_TenueSpeciElev - X25x1_ElvAlterChoiPers,
+  data = donnees_mean2,
+  family = multinomial
+)
+
+summary(multinomial_logistic_model4)
+summary(multinomial_logistic_model5)
+anova(multinomial_logistic_model5)
+
+
+
+multinomial_logistic_model6 <- vglm(
+  y ~ . - X13x2_QUAI_t - T10_PS_AlimPoNourrLongpPo - T16_BS_TenueSpeciElev - X25x1_ElvAlterChoiPers - ENG_TROU,
+  data = donnees_mean2,
+  family = multinomial
+)
+
+summary(multinomial_logistic_model5)
+summary(multinomial_logistic_model6)
+anova(multinomial_logistic_model6)
+
+# Pour l'instant, les coefficients n'ont pas évolué de plus de 10% et on n'a supprimé que des variables avec p-value > à 0.4
+
+# On veut savoir pour quelles variables est-ce qu'on ne peut pas
+
+# Charger les bibliothèques nécessaires
 library(dplyr)
 
-# Supprimer les variables spécifiques de la base de données
-donnees_forest <- donnees_forest %>%
-  select(-"X07x1_AN_CONST4_mean_3", 
-         -"T16_BS_TenueSpeciElev", 
-         -"LR_LRF", 
-         -"T10_PS_AlimPoNourrLongpPo")
+# Extraire les coefficients et erreurs standards du modèle
+coeffs <- c(-4.84332, 2.49321, 1.10426, -1.17940, 1.04740, -0.92783, 4.40365, 
+            3.75603, 5.40594, -3.92282, 0.58251, -3.24695, -1.12856, 3.20187, 
+            -3.87949, -2.47090, -6.11601, -4.19455, 2.88056, 1.59579, 
+            -2.46645, -4.34882, 2.64886, 2.01841, 2.23786, 3.64219)
 
-# Vérifier les nouvelles colonnes de la base de données
-colnames(donnees_forest)
+se <- c(2.66266, 1.07575, 1.29322, 1.03747, 1.10362, 1.26796, 2.02027, 
+        1.41271, 1.85226, 1.44300, 1.39442, 1.53478, 1.69009, 1.81116, 
+        1.52666, 1.47737, 2.57530, 1.47299, 1.43079, 1.51159, 
+        1.62025, 1.82223, 1.24964, 1.23436, 1.09510, 1.44831)
 
-set.seed(36)
-train_index <- createDataPartition(donnees_forest$y, p = 0.8, list = FALSE)
-train_data <- donnees_forest[train_index, ]
-test_data <- donnees_forest[-train_index, ]
+variables <- c("(Intercept):2", "X09x3_FAB_CROISS_reg_rec1:1", 
+               "X09x3_FAB_CROISS_reg_rec1:2", "X22x1_LOC_INF_rec1:1", 
+               "X22x1_LOC_INF_rec1:2", "X06x1_gene_majo_1_rec1:1", 
+               "X06x1_gene_majo_1_rec1:2", "X12x2_MAT_PC2:1", 
+               "X12x2_MAT_PC2:2", "T10_PS_EauDebi_31:1", "T10_PS_EauDebi_31:2", 
+               "T10_PS_EauDebi_32:1", "T10_PS_EauDebi_32:2", 
+               "X07x1_AN_CONST4_mean_31:2", "X07x1_AN_CONST4_mean_32:1", 
+               "X07x1_AN_CONST4_mean_32:2", "LR_LRF1:2", 
+               "T13_ENG_milieuDegrad.x1:2", "X18x2_ABBTX_PS1:1", 
+               "X18x2_ABBTX_PS1:2", "X19x2_ABB_E1:1", "X19x2_ABB_E1:2", 
+               "A03_Pos10sVERS1:1", "A03_Pos10sVERS1:2", 
+               "A03_PosSeroMyAsOui:1", "A03_PosSeroMyAsOui:2")
 
-library("VGAM")
-multinomial_logistic_model <- vglm(y ~ . ,data = train_data, family = multinomial)
+# Calcul des OR et des IC à 95%
+or_values <- exp(coeffs)
+lower_ci <- exp(coeffs - 1.96 * se)  # Borne inférieure de l'IC 95%
+upper_ci <- exp(coeffs + 1.96 * se)  # Borne supérieure de l'IC 95%
+
+# Vérifier si 1 est dans l'intervalle de confiance
+significatif <- ifelse(lower_ci <= 1 & upper_ci >= 1, "NON", "OUI")
+
+# Créer un data frame pour afficher les résultats
+table_or <- data.frame(
+  Variable = variables,
+  OR = round(or_values, 2),
+  IC_95 = paste0("[", round(lower_ci, 2), "; ", round(upper_ci, 2), "]"),
+  Significatif = significatif  # Ajout de la colonne de signification
+)
+
+# Affichage du tableau
+print(table_or)
 ```
+
+A la vue de la significativité de certaines variables, nous sommes tentés de les enlever de la modélisation et d'observer si cette réduction améliore significativement le modèle.
+(Les algorithmes connus permettant d'établir le meilleur modèle automatiquement ne fonctionnent qu'avec les fonctions lm ou glm mais pas vglm, pareil pour la fonction VIF alors nous cherchons à la main)
 
 ```{r}
-model_summary <- summary(multinomial_logistic_model)
-coefficients <- coefficients(model_summary)
+# Modélisation avec 12 variables
+modele_reduit <- vglm(y ~ X09x3_FAB_CROISS_reg_rec +
+                        X22x1_LOC_INF_rec +
+                        X06x1_gene_majo_1_rec +
+                        X12x2_MAT_PC +
+                        T10_PS_EauDebi_3 +
+                        X07x1_AN_CONST4_mean_3 +
+                        LR_LRF +
+                        T13_ENG_milieuDegrad.x +
+                        X19x2_ABB_E +
+                        A03_Pos10sVERS +
+                        A03_PosSeroMyAs +
+                        A03_TxPosSero22sTgReel, 
+                      family = multinomial, data = donnees_mean2)
 
-# Utiliser la méthode 'z' pour obtenir les valeurs des statistiques de Wald
-wald_statistics <- coefficients[, "z value"]
+# Résumé du modèle
+logLik(modele_reduit)
+anova(modele_reduit)
+AIC(modele_reduit)
+BIC(modele_reduit)
 
-# Utiliser la méthode 'Pr(>|z|)' pour obtenir les p-values
-p_values <- coefficients[, "Pr(>|z|)"]
+# Calcul des log-vraisemblance
+logLik_complet <- logLik(multinomial_logistic_model)
+logLik_reduit <- logLik(modele_reduit)
 
-# Vérifier les p-values
-print(p_values)
+# Écart de déviance
+X_stat <- -2 * (logLik_reduit - logLik_complet)
 
-# Identifier les variables avec des p-values significatives (par exemple p < 0.05)
-significant_vars <- names(p_values)[p_values < 0.05]
+# Degrés de liberté de la loi du khi-deux associée
+df <- 21 - 12
 
-# Créer une formule avec les variables significatives
-formula <- as.formula(paste("y ~", paste(significant_vars, collapse = " + ")))
-formula
-# Créer un nouveau modèle avec les variables significatives
-significant_model <- vglm("y ~ X22x1_LOC_INF_rec1:2 + X12x2_MAT_PC2:1 + X12x2_MAT_PC2:2 + 
-    T10_PS_EauDebi_31:1 + X13x2_QUAI_t1:2 + X18x2_ABBTX_PS1:1 + 
-    X19x2_ABB_E1:2 + A03_PosSeroMyAsOui:2 + A03_TxPosSero22sTgReel:1", data = train_data, family = multinomial())
+# Calcul de la p_value
+p_value <- pchisq(X_stat, df, lower.tail = FALSE)
 
-# Afficher le résumé du nouveau modèle
-summary(significant_model)
+# Affichage des résultats
+cat("Statistique du test X² :", X_stat, "\n")
+cat("Degrés de liberté :", df, "\n")
+cat("P-value associée :", p_value, "\n")
 ```
 
+Selon le critère de l'AIC, du BIC, de la log-vraisemblance (significativement à 10^-5) ce modèle réduit est meilleur que le modèle complet
 
+De la même façon, pour autant, nous sommes tentés de retirer les 2 variables moins significatives et nous aimerions savoir si cette réduction est pertinente.
+
+```{r}
+# Modélisation avec 10 variables
+modele_reduit2 <- vglm(y ~ X09x3_FAB_CROISS_reg_rec +
+                        X06x1_gene_majo_1_rec +
+                        X12x2_MAT_PC +
+                        T10_PS_EauDebi_3 +
+                        X07x1_AN_CONST4_mean_3 +
+                        LR_LRF +
+                        T13_ENG_milieuDegrad.x +
+                        A03_Pos10sVERS +
+                        A03_PosSeroMyAs +
+                        A03_TxPosSero22sTgReel, 
+                      family = multinomial, data = donnees_mean2)
+
+# Résumé du modèle
+logLik(modele_reduit2)
+anova(modele_reduit2)
+AIC(modele_reduit2)
+BIC(modele_reduit2)
+
+# Calcul des log-vraisemblance
+logLik_reduit2 <- logLik(modele_reduit2)
+
+# Écart de déviance
+X_stat2 <- -2 * (logLik_reduit2 - logLik_reduit)
+
+# Degrés de liberté de la loi du khi-deux associée
+df2 <- 12 - 10
+
+# Calcul de la p_value
+p_value2 <- pchisq(X_stat2, df2, lower.tail = FALSE)
+
+# Affichage des résultats
+cat("Statistique du test X² :", X_stat2, "\n")
+cat("Degrés de liberté :", df2, "\n")
+cat("P-value associée :", p_value2, "\n")
+```
+
+Selon le critère de l'AIC, du BIC, de la log-vraisemblance (significativement à 0.03) ce modèle réduit est meilleur que le modèle complet
+
+Nous remarquons que la variable "A03_TxPosSero22sTgReel" devient plus significative, elle l'était peu dans le "modele_reduit", regardons ce que cela donne lorsqu'on la supprime du modèle :
+
+```{r}
+# Modélisation avec 9 variables
+modele_reduit3 <- vglm(y ~ X09x3_FAB_CROISS_reg_rec +
+                        X06x1_gene_majo_1_rec +
+                        X12x2_MAT_PC +
+                        T10_PS_EauDebi_3 +
+                        X07x1_AN_CONST4_mean_3 +
+                        LR_LRF +
+                        T13_ENG_milieuDegrad.x +
+                        A03_Pos10sVERS +
+                        A03_PosSeroMyAs, 
+                      family = multinomial, data = donnees_mean2)
+
+# Résumé du modèle
+logLik(modele_reduit3)
+anova(modele_reduit3)
+AIC(modele_reduit3)
+BIC(modele_reduit3)
+
+
+# Calcul des log-vraisemblance
+logLik_reduit3 <- logLik(modele_reduit3)
+
+# Écart de déviance
+X_stat3 <- -2 * (logLik_reduit3 - logLik_reduit2)
+
+# Degrés de liberté de la loi du khi-deux associée
+df3 <- 1
+
+# Calcul de la p-value
+p_value3 <- pchisq(X_stat3, df3, lower.tail = FALSE)
+
+# Affichage des résultats
+cat("Statistique du test X² :", X_stat3, "\n")
+cat("Degrés de liberté :", df3, "\n")
+cat("P-value associée :", p_value3, "\n")
+```
+
+Selon le critère de l'AIC, il ne semble pas pertinent de retirer "A03_TxPosSero22sTgReel" (On sait que l'AIC a tendance à vouloir conserver plus de variables que les autres critères). Mais selon le critère du BIC, de la log-vraisemblance (significativement à 0.015) ce modèle réduit est meilleur que le modèle précédent. Nous conservons alors ce modèle à 9 variables (les 9 variables ont une p-value inférieure à 0.015 !).
+
+Création de la matrice de confusion :
+
+```{r}
+# On obtient les prédictions du modèle (sur les mêmes valeurs qui l'ont entrainé, notre objectif final n'est pas de faire de la prédiction mais de la modélisation)
+predictions <- predict(modele_reduit3, newdata = donnees_mean2, type = "response")
+classes_pred <- apply(predictions, 1, which.max)
+classes_pred <- factor(classes_pred, levels = c(1, 2, 3), labels = c("ENG_malade", "PS_malade", "Sain"))
+
+# On crée la matrice de confusion
+confusion.matrix <- table(True = donnees_mean2$y, Predicted = classes_pred)
+confusion.matrix
+confusion.matrix_norm <- prop.table(confusion.matrix, 1)*100
+round(confusion.matrix_norm,1)
+```
+
+On cherche maintenant à avoir une meilleure visualisation de cette matrice de confusion.
+
+```{r}
+# Visualiser la matrice de confusion normalisée
+confusion_df <- melt(confusion.matrix_norm)
+colnames(confusion_df) <- c("True", "Predicted", "Value")
+
+ggplot(data = confusion_df, aes(x = True, y = Predicted, fill = Value)) +
+  geom_tile() +
+  geom_text(aes(label = sprintf("%.2f", Value)), color = "white") +
+  scale_fill_gradient(low = "white", high = "red") +
+  theme_minimal() +
+  labs(title = "Matrice de Confusion Normalisée", x = "Classe Réelle", y = "Classe Prédite")
+```
+
+Désormais, on cherche à observer la précision et la sensibilité du modèle :
+
+```{r}
+true_classes <- donnees_mean2$y
+
+# Utiliser la fonction confusionMatrix du package 'caret'
+conf_matrix <- confusionMatrix(factor(classes_pred, levels = c("ENG_malade", "PS_malade", "Sain") ), factor(true_classes))
+
+# Récupérer les précisions et rappels par classe
+precision <- conf_matrix$byClass[,"Pos Pred Value"]
+recall <- conf_matrix$byClass[,"Sensitivity"]
+
+# Créer un dataframe pour la visualisation
+metrics_df <- data.frame(
+  Classe = c("ENG_malade", "PS_malade", "Sain"),
+  Precision = precision,
+  sensitivity = recall
+)
+
+metrics_df
+```
+
+La précision mesure la proportion des prédictions positives qui sont correctes.
+La sensibilité mesure la capacité du modèle à détecter les vrais positifs.
+
+Nous pouvons donc dire que le modèle est satisfaisant (environ 70% de bonne modélisation). Le point visiblement négatif est que pour 26% des élevages que nous avons classé en "ENG_malade", le modèle les prédit en "PS_malade".
+
+On rappelle que les classes "ENG_malade" et "PS_malade" n'indiquent pas un élevage 100% malade mais indiquent uniquement une tendance des porcs à tousser et/ou à éternuer plus que la moyenne des élevages.
+
+Reste à faire l'interprétation des résultats de la régression logistique multinomiale (de combien est-ce qu'une variable augmente la probabilité à être malade, etc...)
+
+```{r}
+summary(modele_reduit3)
+summary(donnees_mean2$y)
+
+```
